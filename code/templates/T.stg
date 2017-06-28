@@ -1,0 +1,2 @@
+group T;
+assign(x,y) ::= "<x> := <y>;"

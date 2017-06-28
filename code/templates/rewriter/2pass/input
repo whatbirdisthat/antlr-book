@@ -1,0 +1,8 @@
+int x;
+/* A simple function foo */
+void foo() {
+    int y;
+    y = 1;
+    g(34,y /* inside */); /* end of line comment */
+    /* start */ x = h();
+}

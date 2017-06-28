@@ -1,0 +1,17 @@
+digraph NFA {
+rankdir=LR;
+node [fontsize=11, shape = circle, fixedsize=true, width=.4]; "s0"
+node [fontsize=11, shape = circle, fixedsize=true, width=.4]; "s1"
+node [fontsize=11, shape = circle, fixedsize=true, width=.4]; "s3"
+node [fontsize=11, shape = circle, fixedsize=true, width=.4]; "s4"
+node [fontsize=11, shape = doublecircle, fixedsize=true, width=.6]; "s5=>1"
+node [fontsize=11, shape = doublecircle, fixedsize=true, width=.6]; "s6=>2"
+node [fontsize=11, shape = doublecircle, fixedsize=true, width=.6]; "s2=>3"
+"s0" -> "s1" [fontsize=11, fontname="Courier", arrowsize=.7, label = "ID", arrowhead = normal];
+"s1" -> "s3" [fontsize=11, fontname="Courier", arrowsize=.7, label = "ID", arrowhead = normal];
+"s3" -> "s4" [fontsize=11, fontname="Courier", arrowsize=.7, label = "';'", arrowhead = normal];
+"s4" -> "s5=>1" [fontsize=11, fontname="Times-Italic", arrowsize=.7, label = "{is \"if\"}?", arrowhead = normal];
+"s4" -> "s6=>2" [fontsize=11, fontname="Times-Italic", arrowsize=.7, label = "{is \"call\"}?", arrowhead = normal];
+"s3" -> "s5=>1" [fontsize=11, fontname="Courier", arrowsize=.7, label = "ID", arrowhead = normal];
+"s0" -> "s2=>3" [fontsize=11, fontname="Courier", arrowsize=.7, label = "';'", arrowhead = normal];
+}

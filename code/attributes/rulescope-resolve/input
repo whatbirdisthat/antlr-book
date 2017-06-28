@@ -1,0 +1,12 @@
+{
+  int i;
+  int j;
+  {
+    int i;
+    int x;
+    x = 5;
+    i = 9;
+    j = 4;
+  }
+  x = 3;
+}

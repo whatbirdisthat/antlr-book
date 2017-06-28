@@ -1,0 +1,9 @@
+int x;
+/* A simple function foo */
+void foo() {
+    int y;
+    y = 1; write_to("y",y);
+    /* start */ g(34,y); call("g"); /* end of line comment */
+    x = eval("h",h(/* inside */)); write_to("x",x);
+}
+

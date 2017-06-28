@@ -1,0 +1,78 @@
+// START:file
+group ByteCode;
+
+jasminFile(maxStackDepth, maxLocals, instructions) ::= <<
+; public class Calc extends Object { ...}
+.class public Calc
+.super java/lang/Object
+
+; public Calc() { super(); } // calls java.lang.Object()
+.method public \<init>()V
+   aload_0
+   invokenonvirtual java/lang/Object/\<init>()V
+   return
+.end method
+
+; main(): Expr.g will generate bytecode in this method
+.method public static main([Ljava/lang/String;)V
+   .limit stack <maxStackDepth> ; how much stack space do we need?
+   .limit locals <maxLocals> ; how many locals do we need?
+   getstatic java/lang/System/out Ljava/io/PrintStream;
+   ; code translated from input stream
+   <instructions; separator="\n">
+   ; print result on top of stack
+   invokevirtual java/io/PrintStream/println(I)V
+   return
+.end method
+>>
+// END:file
+
+// START:assign
+assign(varNum,v,descr,id) ::= <<
+; compute <descr>
+<v>
+istore <varNum> ; <id>
+>>
+// END:assign
+
+// START:exprStat
+exprStat(v, descr) ::= <<
+; compute <descr>
+<v>
+>>
+// END:exprStat
+
+// START:expr
+expr(firstExpr, ops) ::= <<
+<firstExpr>
+<ops>
+>>
+// END:expr
+
+// START:addsub
+add(opnd) ::= <<
+<opnd>
+iadd
+>>
+
+sub(opnd) ::= <<
+<opnd>
+isub
+>>
+// END:addsub
+
+// START:mult
+mult(firstExpr,opnds) ::= <<
+<firstExpr>
+<opnds:{o|
+<o>
+imul
+}>
+>>
+// END:mult
+
+// START:values
+int(v) ::= "ldc <v>"
+
+var(id, varNum) ::= "iload <varNum> ; <id>"
+// END:values

@@ -1,0 +1,9 @@
+digraph NFA {
+rankdir=LR;
+node [fontsize=11, shape = circle, fixedsize=true, width=.4]; "s0"
+node [fontsize=11, shape = circle, fixedsize=true, width=.4]; "s1"
+node [fontsize=11, shape = doublecircle, fixedsize=true, width=.6]; "s2=>1"
+"s0" -> "s1" [fontsize=11, fontname="Courier", arrowsize=.7, label = "EOF", arrowhead = normal];
+"s1" -> "s2=>1" [fontsize=11, fontname="Courier", arrowsize=.7, label = "{synpred1}?", arrowhead = normal];
+"s0" -> "s2=>1" [fontsize=11, fontname="Courier", arrowsize=.7, label = "'int'", arrowhead = normal];
+}

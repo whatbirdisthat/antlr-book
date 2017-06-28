@@ -1,0 +1,13 @@
+int i;
+void f()
+{
+  int i;
+  {
+    int i;
+    i = 2;
+  }
+  i = 1;
+}
+void g() {
+  i = 0;
+}
