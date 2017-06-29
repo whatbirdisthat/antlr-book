@@ -1,0 +1,1880 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+      <meta charset="utf-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta name="generator" content="pandoc" />
+          <meta name="author" content="Thorsten Ball" />
+              <meta name="date" content="2017-01-01" />
+              <title>The Lost Chapter: A Macro System For Monkey</title>
+      <style type="text/css">code{white-space: pre;}</style>
+        <style type="text/css">
+    body {
+      margin: 40px auto;
+
+      max-width:700px;
+
+      padding: 0 10px;
+
+      font-family: Georgia, serif;
+      font-size: 18px;
+
+      line-height: 1.45;
+      color: black;
+    }
+
+    h1, h2, h3 {
+      line-height:1.2;
+    }
+
+    pre {
+      padding-left:15px;
+    }
+
+    .cover {
+      text-align: center;
+    }
+
+    .cover img {
+      max-width: 400px;
+    }
+
+    #TOC {
+      margin-top: 5em;
+    }
+
+    .sourceCode {
+      line-height: 1.4;
+      font-size: 15px;
+    }
+
+    .figure {
+      text-align:center;
+    }
+
+    .caption {
+      font-style:italic;
+    }
+    </style>
+          <style type="text/css">
+    div.sourceCode { overflow-x: auto; }
+    table.sourceCode, tr.sourceCode, td.lineNumbers, td.sourceCode {
+      margin: 0; padding: 0; vertical-align: baseline; border: none; }
+    table.sourceCode { width: 100%; line-height: 100%; }
+    td.lineNumbers { text-align: right; padding-right: 4px; padding-left: 4px; color: #aaaaaa; border-right: 1px solid #aaaaaa; }
+    td.sourceCode { padding-left: 5px; }
+    code > span.kw { color: #007020; font-weight: bold; } /* Keyword */
+    code > span.dt { color: #902000; } /* DataType */
+    code > span.dv { color: #40a070; } /* DecVal */
+    code > span.bn { color: #40a070; } /* BaseN */
+    code > span.fl { color: #40a070; } /* Float */
+    code > span.ch { color: #4070a0; } /* Char */
+    code > span.st { color: #4070a0; } /* String */
+    code > span.co { color: #60a0b0; font-style: italic; } /* Comment */
+    code > span.ot { color: #007020; } /* Other */
+    code > span.al { color: #ff0000; font-weight: bold; } /* Alert */
+    code > span.fu { color: #06287e; } /* Function */
+    code > span.er { color: #ff0000; font-weight: bold; } /* Error */
+    code > span.wa { color: #60a0b0; font-weight: bold; font-style: italic; } /* Warning */
+    code > span.cn { color: #880000; } /* Constant */
+    code > span.sc { color: #4070a0; } /* SpecialChar */
+    code > span.vs { color: #4070a0; } /* VerbatimString */
+    code > span.ss { color: #bb6688; } /* SpecialString */
+    code > span.im { } /* Import */
+    code > span.va { color: #19177c; } /* Variable */
+    code > span.cf { color: #007020; font-weight: bold; } /* ControlFlow */
+    code > span.op { color: #666666; } /* Operator */
+    code > span.bu { } /* BuiltIn */
+    code > span.ex { } /* Extension */
+    code > span.pp { color: #bc7a00; } /* Preprocessor */
+    code > span.at { color: #7d9029; } /* Attribute */
+    code > span.do { color: #ba2121; font-style: italic; } /* Documentation */
+    code > span.an { color: #60a0b0; font-weight: bold; font-style: italic; } /* Annotation */
+    code > span.cv { color: #60a0b0; font-weight: bold; font-style: italic; } /* CommentVar */
+    code > span.in { color: #60a0b0; font-weight: bold; font-style: italic; } /* Information */
+      </style>
+                  </head>
+  <body>
+            <div id="header">
+    <div class="cover">
+      <img src="./images/html_cover_lost_chapter.png">
+    </div>
+    <h1 class="title">The Lost Chapter: A Macro System For Monkey</h1>
+            <h2 class="author">Thorsten Ball</h2>
+        </div>
+            <div id="TOC">
+    <h3>Contents</h3>
+    <ul>
+    <li><a href="#macro-systems">5.1 - Macro Systems</a></li>
+    <li><a href="#a-macro-system-for-monkey">5.2 - A Macro System For Monkey</a></li>
+    <li><a href="#quote">5.3 - Quote</a></li>
+    <li><a href="#unquote">5.4 - Unquote</a><ul>
+    <li><a href="#walking-the-tree">Walking the tree</a></li>
+    <li><a href="#replacing-unquote-calls">Replacing Unquote Calls</a></li>
+    </ul></li>
+    <li><a href="#macro-expansion">5.5 - Macro Expansion</a><ul>
+    <li><a href="#the-macro-keyword">The Macro Keyword</a></li>
+    <li><a href="#parsing-macro-literals">Parsing Macro Literals</a></li>
+    <li><a href="#define-macros">Define Macros</a></li>
+    <li><a href="#expand-macros">Expand Macros</a></li>
+    <li><a href="#the-mighty-unless-macro">The Mighty Unless Macro</a></li>
+    </ul></li>
+    <li><a href="#extending-the-repl">5.6 - Extending the REPL</a></li>
+    <li><a href="#dream-on...-in-macros">5.7 - Dream On... In Macros</a></li>
+    </ul>
+    </div>
+        <h2 id="macro-systems">5.1 - Macro Systems</h2>
+<p>Macro systems are the features of programming languages that concern themselves with macros: how to define them, how to access them, how to evaluate them and how the macros themselves work. They can be divided into two broad categories: text-substitution macro systems and syntactic macro systems. In my mind, they are the search-and-replace and the code-as-data camps.</p>
+<p>The first category, text-substitution macros, are arguably the simpler form. One example for this type of macro system is the C preprocessor. It allows you to generate and modify C code by using a separate macro language in the rest of your normal C code. It works by parsing and evaluating this separate language before the resulting code is then compiled by the C compiler. Here is a simple example:</p>
+<div class="sourceCode"><pre class="sourceCode c"><code class="sourceCode c"><span class="pp">#define GREETING &quot;Hello there&quot;</span>
+
+<span class="dt">int</span> main(<span class="dt">int</span> argc, <span class="dt">char</span> *argv[])
+{
+<span class="pp">#ifdef DEBUG</span>
+  printf(GREETING <span class="st">&quot; Debug-Mode!</span><span class="sc">\n</span><span class="st">&quot;</span>);
+<span class="pp">#else</span>
+  printf(GREETING <span class="st">&quot; Production-Mode!</span><span class="sc">\n</span><span class="st">&quot;</span>);
+<span class="pp">#endif</span>
+
+  <span class="cf">return</span> <span class="dv">0</span>;
+}</code></pre></div>
+<p>The instructions for the preprocessor are the lines prefixed with <code>#</code>. In the first line we define a variable, <code>GREETING</code>, which will be replaced with <code>&quot;Hello there&quot;</code> in the rest of the source code. Quite literally, too, so you really have to pay attention to escaping and scoping concerns. In the third line we check whether the preprocessor variable <code>DEBUG</code> is defined - either by us, our build system, our compiler or the C libraries shipping with our operating system. Based on that either the <code>Debug-Mode</code> or the <code>Production-Mode</code> statements are produced.</p>
+<p>It's a simple system that works remarkably well when used with care and restraint. But there are limits to what it can do, because its influence on the code it produces exists merely on a textual level. In that regard it's much more closer to a templating system than the macro systems of the second category, the syntactic macros.</p>
+<p>These macro systems do not work with code as text, but they treat <em>code as data</em>. Sounds weird? Yes. If you're unaccustomed to it, this can be a pretty strange thought. But it's not hard to understand, I promise. It just needs a slight shift in perspective to be fully grasped.</p>
+<p>In fact, we've already touched upon this in chapter 2 when we looked at how lexers and parsers turn source code from text into ASTs. ASTs represent source code with data structures other than strings. These data structures are available in the language in which the parser operates. In our case, we turned Monkey source code, initially a string, into the Go structs that make up our Monkey AST. And then we could treat the code as data: we could pass around, modify and generate Monkey source code inside our Go program.</p>
+<p>In languages with syntactic macros you can do that <em>in the language itself</em>, not just in an outer host language. If a language X has a syntactic macro system, you can use language X to work with source code written in X. Just like we worked with Monkey source code while using Go. &quot;Pass this if-expression to this function, take this function call and save it here, change the name used in this let-statement.&quot; The language becomes <em>self-aware</em>, so to speak, and with macros allows you to inspect and modify itself. Like a surgeon operating on themself. Nice, right?</p>
+<p>This type of macro system was pioneered by Lisp and can now be found in a lot of its descendants: Common Lisp, Clojure, Scheme, Racket. But also non-Lisp languages like Elixir and Julia have elegant macro systems that are built on this idea of treating code as data and allowing macros to access it.</p>
+<p>This is all still pretty abstract, so let's try to clear up some confusion by playing around with such a syntactic macro system. We're going to use Elixir, because its syntax is easy to read and understand. But the ideas and mechanisms apply to all of the languages mentioned above.</p>
+<p>The first we need to understand is Elixir's <code>quote</code> function. It allows us to stop code from being evaluated - effectively turning code into data:</p>
+<div class="sourceCode"><pre class="sourceCode elixir"><code class="sourceCode elixir">iex(<span class="dv">1</span>)<span class="op">&gt;</span> <span class="kw">quote</span> <span class="kw">do</span>: <span class="dv">10</span> <span class="op">+</span> <span class="dv">5</span>
+{:<span class="op">+</span>, [<span class="va">context:</span> <span class="cn">Elixir</span>, <span class="im">import</span>: <span class="cn">Kernel</span>], [<span class="dv">10</span>, <span class="dv">5</span>]}</code></pre></div>
+<p>Here we pass the infix expression <code>10 + 5</code> to <code>quote</code> as a single argument in a <code>do</code> block. But instead of <code>10 + 5</code> being evaluated - as arguments in function calls normally are - <code>quote</code> returns a data structure that represents this very expression. It's a tuple containing the operator <code>:+</code>, meta information like the context of the call, and the list of operands <code>[10, 5]</code>. This is Elixir's AST and how Elixir represents code all throughout the language.</p>
+<p>We can access it just like any other tuple:</p>
+<div class="sourceCode"><pre class="sourceCode elixir"><code class="sourceCode elixir">iex(<span class="dv">2</span>)<span class="op">&gt;</span> exp <span class="op">=</span> <span class="kw">quote</span> <span class="kw">do</span>: <span class="dv">10</span> <span class="op">+</span> <span class="dv">5</span>
+{:<span class="op">+</span>, [<span class="va">context:</span> <span class="cn">Elixir</span>, <span class="im">import</span>: <span class="cn">Kernel</span>], [<span class="dv">10</span>, <span class="dv">5</span>]}
+iex(<span class="dv">3</span>)<span class="op">&gt;</span> elem(exp, <span class="dv">0</span>)
+:<span class="op">+</span>
+iex(<span class="dv">4</span>)<span class="op">&gt;</span> elem(exp, <span class="dv">2</span>)
+[<span class="dv">10</span>, <span class="dv">5</span>]</code></pre></div>
+<p>So <code>quote</code> allows us to stop the evaluation of code and treat code as data. That's already super interesting, but we can take it up a notch.</p>
+<p>Let's say we want to use <code>quote</code> to build an AST node that represents an infix expression involving three integer literals. One of the numbers should be injected into the AST dynamically. It's bound to a name, <code>my_number</code>, and we only want to refer to it by this name. Here's a first attempt using <code>quote</code> that doesn't work:</p>
+<div class="sourceCode"><pre class="sourceCode elixir"><code class="sourceCode elixir">iex(<span class="dv">6</span>)<span class="op">&gt;</span> my_number <span class="op">=</span> <span class="dv">99</span>
+<span class="dv">99</span>
+iex(<span class="dv">7</span>)<span class="op">&gt;</span> <span class="kw">quote</span> <span class="kw">do</span>: <span class="dv">10</span> <span class="op">+</span> <span class="dv">5</span> <span class="op">+</span> my_number
+{:<span class="op">+</span>, [<span class="va">context:</span> <span class="cn">Elixir</span>, <span class="im">import</span>: <span class="cn">Kernel</span>],
+ [{:<span class="op">+</span>, [<span class="va">context:</span> <span class="cn">Elixir</span>, <span class="im">import</span>: <span class="cn">Kernel</span>], [<span class="dv">10</span>, <span class="dv">5</span>]}, {<span class="va">:my_number</span>, [], <span class="cn">Elixir</span>}]}</code></pre></div>
+<p>And of course it doesn't. <code>quote</code> stops its argument from being evaluated. So <code>my_number</code> is just an identifier when passed to <code>quote</code>. It doesn't resolve to <code>99</code>, because it's not evaluated. For that, we need another function, called <code>unquote</code>:</p>
+<div class="sourceCode"><pre class="sourceCode elixir"><code class="sourceCode elixir">iex(<span class="dv">8</span>)<span class="op">&gt;</span> <span class="kw">quote</span> <span class="kw">do</span>: <span class="dv">10</span> <span class="op">+</span> <span class="dv">5</span> <span class="op">+</span> <span class="kw">unquote</span>(my_number)
+{:<span class="op">+</span>, [<span class="va">context:</span> <span class="cn">Elixir</span>, <span class="im">import</span>: <span class="cn">Kernel</span>],
+ [{:<span class="op">+</span>, [<span class="va">context:</span> <span class="cn">Elixir</span>, <span class="im">import</span>: <span class="cn">Kernel</span>], [<span class="dv">10</span>, <span class="dv">5</span>]}, <span class="dv">99</span>]}</code></pre></div>
+<p><code>unquote</code> allows us to &quot;jump out of&quot; the <code>quote</code> context and evaluate code. Here it causes the identifier <code>my_number</code> to evaluate to <code>99</code>.</p>
+<p>These two, <code>quote</code> and <code>unquote</code>, are the tools Elixir gives us to influence when and how code is evaluated or left untouched and turned into data. Most often they are used inside macros, which we can define in Elixir with the keyword <code>defmacro</code>. Here is a simple example, a macro that turns infix expressions using a <code>+</code> operator into infix expressions using <code>-</code>, called <code>plus_to_minus</code>:</p>
+<div class="sourceCode"><pre class="sourceCode elixir"><code class="sourceCode elixir"><span class="kw">defmodule</span> <span class="cn">MacroExample</span> <span class="kw">do</span>
+  <span class="kw">defmacro</span> plus_to_minus(expression) <span class="kw">do</span>
+    args <span class="op">=</span> elem(expression, <span class="dv">2</span>)
+
+    <span class="kw">quote</span> <span class="kw">do</span>
+      <span class="kw">unquote</span>(<span class="cn">Enum</span><span class="op">.</span>at(args, <span class="dv">0</span>)) <span class="op">-</span> <span class="kw">unquote</span>(<span class="cn">Enum</span><span class="op">.</span>at(args, <span class="dv">1</span>))
+    <span class="kw">end</span>
+  <span class="kw">end</span>
+<span class="kw">end</span></code></pre></div>
+<p>The most important thing about macros in Elixir (and a lot of languages with this type of macro system) is this: everything that's passed to a macro as an argument is <code>quote</code>d. A macro's arguments are not evaluated and can be accessed like any other piece of data.</p>
+<p>We do just that in the first line of <code>plus_to_minus</code>. We bind the arguments of the passed-in expression to <code>args</code> and then we use <code>quote</code> and <code>unquote</code> to construct the AST of an infix expression. Note: this new expression uses <code>-</code> to subtract the second argument from the first.</p>
+<p>If this macro is called with a <code>10 + 5</code> as the argument, what comes out is not <code>15</code>, but this, the result of evaluating <code>10 - 5</code>:</p>
+<div class="sourceCode"><pre class="sourceCode elixir"><code class="sourceCode elixir">iex(<span class="dv">1</span>)<span class="op">&gt;</span> <span class="cn">MacroExample</span><span class="op">.</span>plus_to_minus <span class="dv">10</span> <span class="op">+</span> <span class="dv">5</span>
+<span class="dv">5</span></code></pre></div>
+<p>Yes, we just modified code like it was data! That's much more powerful than the C preprocessor, isn't it? Here in the code-as-data camp is where things get interesting! Code as data? Code modifying itself? Surgeons operating on themselves? Macros writing code? Writing code that writes code? Sweet Monkey yes, I'm in!</p>
+<p>Naturally, I decided that if Monkey should have a macro system, it needs to be of this kind. And this is what we're going to build. A syntactic macro system for Monkey that allows us to access, modify and generate Monkey source code.</p>
+<p>Let's do this!</p>
+<h2 id="a-macro-system-for-monkey">5.2 - A Macro System For Monkey</h2>
+<p>Adding macros to a programming language means, first and foremost, answering a lot of questions: &quot;How exactly? Which consequences does this change have? What is this influenced by?&quot; Having a clear picture of the outcome in mind keeps us from getting lost in these questions. So before we begin, as always, let's get a clear picture of what we actually want to build.</p>
+<p>The macro system we're going to add to Monkey will be modelled after Elixir's, which itself is modelled after a simple <code>define-macro</code> system known from the Lisp and Scheme world.</p>
+<p>The first things we're going to add are the <code>quote</code> and <code>unquote</code> functions. They will allow us to influence when exactly Monkey code is evaluated.</p>
+<p>Here is what using <code>quote</code> in Monkey will look like:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript">$ go run <span class="va">main</span>.<span class="at">go</span>
+Hello mrnugget<span class="op">!</span> This is the Monkey programming language<span class="op">!</span>
+Feel free to type <span class="kw">in</span> commands
+<span class="op">&gt;&gt;</span> <span class="at">quote</span>(foobar)<span class="op">;</span>
+<span class="at">QUOTE</span>(foobar)
+<span class="op">&gt;&gt;</span> <span class="at">quote</span>(<span class="dv">10</span> <span class="op">+</span> <span class="dv">5</span>)<span class="op">;</span>
+<span class="at">QUOTE</span>((<span class="dv">10</span> <span class="op">+</span> <span class="dv">5</span>))
+<span class="op">&gt;&gt;</span> <span class="at">quote</span>(foobar <span class="op">+</span> <span class="dv">10</span> <span class="op">+</span> <span class="dv">5</span> <span class="op">+</span> barfoo)<span class="op">;</span>
+<span class="at">QUOTE</span>((((foobar <span class="op">+</span> <span class="dv">10</span>) <span class="op">+</span> <span class="dv">5</span>) <span class="op">+</span> barfoo))</code></pre></div>
+<p>As you can see, <code>quote</code> will take one argument and stop it from being evaluated. It will return an object that represents the quoted code.</p>
+<p>The matching <code>unquote</code> function will allow us to circumvent <code>quote</code>:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="op">&gt;&gt;</span> <span class="at">quote</span>(<span class="dv">8</span> <span class="op">+</span> <span class="at">unquote</span>(<span class="dv">4</span> <span class="op">+</span> <span class="dv">4</span>))<span class="op">;</span>
+<span class="at">QUOTE</span>((<span class="dv">8</span> <span class="op">+</span> <span class="dv">8</span>))</code></pre></div>
+<p><code>unquote</code> will only be usable inside the expression that's passed to <code>quote</code>. But in there it will also be possible to <code>unquote</code> source code that's been <code>quote</code>d before:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="op">&gt;&gt;</span> <span class="kw">let</span> quotedInfixExpression <span class="op">=</span> <span class="at">quote</span>(<span class="dv">4</span> <span class="op">+</span> <span class="dv">4</span>)<span class="op">;</span>
+<span class="op">&gt;&gt;</span> quotedInfixExpression<span class="op">;</span>
+<span class="at">QUOTE</span>((<span class="dv">4</span> <span class="op">+</span> <span class="dv">4</span>))
+<span class="op">&gt;&gt;</span> <span class="at">quote</span>(<span class="at">unquote</span>(<span class="dv">4</span> <span class="op">+</span> <span class="dv">4</span>) <span class="op">+</span> <span class="at">unquote</span>(quotedInfixExpression))<span class="op">;</span>
+<span class="at">QUOTE</span>((<span class="dv">8</span> <span class="op">+</span> (<span class="dv">4</span> <span class="op">+</span> <span class="dv">4</span>)))</code></pre></div>
+<p>We're going to need that when we put in the final piece of the macro system: the <code>macro</code> literals. They allow us to define macros:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="op">&gt;&gt;</span> <span class="kw">let</span> reverse <span class="op">=</span> <span class="at">macro</span>(a<span class="op">,</span> b) <span class="op">{</span> <span class="at">quote</span>(<span class="at">unquote</span>(b) <span class="op">-</span> <span class="at">unquote</span>(a))<span class="op">;</span> <span class="op">};</span>
+<span class="op">&gt;&gt;</span> <span class="at">reverse</span>(<span class="dv">2</span> <span class="op">+</span> <span class="dv">2</span><span class="op">,</span> <span class="dv">10</span> <span class="op">-</span> <span class="dv">5</span>)<span class="op">;</span>
+<span class="dv">1</span></code></pre></div>
+<p>Macro literals look just like function literals, except that the keyword is not <code>fn</code> but <code>macro</code>. And once a macro is bound to a name we can call it like a function, too. Except that these calls will be evaluated in a different way. Just like in Elixir the arguments won't be evaluated before being passed to the macro's body. Combined with the aforementioned ability to <code>unquote</code> code that's been <code>quote</code>d before, that allows us to selectively evaluate macro arguments, which are just <code>quote</code>d code:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="op">&gt;&gt;</span> <span class="kw">let</span> evalSecondArg <span class="op">=</span> <span class="at">macro</span>(a<span class="op">,</span> b) <span class="op">{</span> <span class="at">quote</span>(<span class="at">unquote</span>(b)) <span class="op">};</span>
+<span class="op">&gt;&gt;</span> <span class="at">evalSecondArg</span>(<span class="at">puts</span>(<span class="st">&quot;not printed&quot;</span>)<span class="op">,</span> <span class="at">puts</span>(<span class="st">&quot;printed&quot;</span>))<span class="op">;</span>
+printed</code></pre></div>
+<p>By returning code that only contains the second argument, the <code>puts(&quot;printed&quot;)</code> expression, we effectively stop the first argument from being evaluated.</p>
+<p>If any of these examples don't make sense yet, don't worry! That'll change. We'll see exactly how and why they work, because we're going to build the features they use ourselves, from scratch.</p>
+<p>Of course, while building our macro system, we will have to make trade-offs. The biggest being that it won't be as polished and feature-complete as its production-ready counterparts in other languages. But we'll build a fully working macro system nonetheless. It'll be easy to understand and easy to extend, so we can always tweak, optimize and improve it in any way we want later on.</p>
+<p>Let's write code that lets us write code that writes code!</p>
+<h2 id="quote">5.3 - Quote</h2>
+<p>The first thing we are going to add is the <code>quote</code> function. <code>quote</code> will only be used inside macros and its purpose is simply stated: when called, it stops its argument from being evaluated. Instead it returns the AST node representing the argument.</p>
+<p>How do we implement that? Let's start with the return value. Every function in Monkey returns values of the interface type <code>object.Object</code>. And <code>quote</code> can't be an exception here, since that would break our <code>Eval</code> function, which relies on every Monkey value being an <code>object.Object</code> and itself returns an <code>object.Object</code>.</p>
+<p>So in order for <code>quote</code> to return an <code>ast.Node</code> we need a simple wrapper that allows us to pass around an <code>object.Object</code> containing an <code>ast.Node</code>. Here it is:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// object/object.go</span>
+
+<span class="kw">const</span> (
+<span class="co">// [...]</span>
+
+    QUOTE_OBJ = <span class="st">&quot;QUOTE&quot;</span>
+)
+
+<span class="kw">type</span> Quote <span class="kw">struct</span> {
+    Node ast.Node
+}
+
+<span class="kw">func</span> (q *Quote) Type() ObjectType { <span class="kw">return</span> QUOTE_OBJ }
+<span class="kw">func</span> (q *Quote) Inspect() <span class="dt">string</span> {
+    <span class="kw">return</span> <span class="st">&quot;QUOTE(&quot;</span> + q.Node.String() + <span class="st">&quot;)&quot;</span>
+}</code></pre></div>
+<p>There's not much to it, right? <code>object.Quote</code> is just a thin wrapper around an <code>ast.Node</code>. But it allows us to take the next step: when we evaluate a call to <code>quote</code>, we now need to stop the argument of the call from being evaluated. Instead we need to wrap it in an <code>object.Quote</code> and return that instead. And that shouldn't pose a problem, since we have full control over what gets evaluated in our <code>Eval</code> function.</p>
+<p>Let's write a simple test case that makes sure that exactly this happens when <code>quote</code> is called:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote_test.go</span>
+
+<span class="kw">package</span> evaluator
+
+<span class="kw">import</span> (
+    <span class="st">&quot;testing&quot;</span>
+
+    <span class="st">&quot;monkey/object&quot;</span>
+)
+
+<span class="kw">func</span> TestQuote(t *testing.T) {
+    tests := []<span class="kw">struct</span> {
+        input    <span class="dt">string</span>
+        expected <span class="dt">string</span>
+    }{
+        {
+            <span class="st">`quote(5)`</span>,
+            <span class="st">`5`</span>,
+        },
+    }
+
+    <span class="kw">for</span> _, tt := <span class="kw">range</span> tests {
+        evaluated := testEval(tt.input)
+        quote, ok := evaluated.(*object.Quote)
+        <span class="kw">if</span> !ok {
+            t.Fatalf(<span class="st">&quot;expected *object.Quote. got=%T (%+v)&quot;</span>,
+                evaluated, evaluated)
+        }
+
+        <span class="kw">if</span> quote.Node == <span class="ot">nil</span> {
+            t.Fatalf(<span class="st">&quot;quote.Node is nil&quot;</span>)
+        }
+
+        <span class="kw">if</span> quote.Node.String() != tt.expected {
+            t.Errorf(<span class="st">&quot;not equal. got=%q, want=%q&quot;</span>,
+                quote.Node.String(), tt.expected)
+        }
+    }
+}</code></pre></div>
+<p>At first glance this looks just like any other test in the <code>evaluator</code> package, where we pass source code to <code>Eval</code> and expect it to return a certain type of object. And this test does that too. It passes the <code>tt.input</code> to <code>testEval</code> and expects it to return an <code>*object.Quote</code>. The difference comes at the end.</p>
+<p>With the last assertion we make sure that the correct <code>ast.Node</code> is wrapped inside of that <code>*object.Quote</code> by comparing the return value of the node's <code>String()</code> method with the <code>tt.expected</code> string. That makes the tests really expressive and readable, because we don't have to build <code>ast.Node</code>s by hand with verbose struct literals. The downside is that we're testing through another abstraction layer. That's okay in this case though, because we're confident in the simple <code>String()</code> methods of our <code>ast.Node</code>s. We should keep their limitations in mind though.</p>
+<p>Now that we know how this test function works, here are a few more test cases that make clearer how evaluating a call to <code>quote</code> doesn't evaluate its argument:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote_test.go</span>
+
+<span class="kw">func</span> TestQuote(t *testing.T) {
+    tests := []<span class="kw">struct</span> {
+        input    <span class="dt">string</span>
+        expected <span class="dt">string</span>
+    }{
+<span class="co">// [...]</span>
+        {
+            <span class="st">`quote(5 + 8)`</span>,
+            <span class="st">`(5 + 8)`</span>,
+        },
+        {
+            <span class="st">`quote(foobar)`</span>,
+            <span class="st">`foobar`</span>,
+        },
+        {
+            <span class="st">`quote(foobar + barfoo)`</span>,
+            <span class="st">`(foobar + barfoo)`</span>,
+        },
+    }
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>Since the only thing we've implemented so far is the <code>object.Quote</code> definition, the tests fail:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+--- FAIL: TestQuote (0.00s)
+  quote_unquote_test.go:37: expected *object.Quote. got=*object.Error\
+     (&amp;{Message:identifier not found: quote})
+FAIL
+FAIL    monkey/evaluator        0.009s</code></pre></div>
+<p>Here's what's happening to make this test fail. The parser first turns <code>quote()</code> calls into <code>*ast.CallExpression</code>s. <code>Eval</code> then takes these expressions and evaluates them just like any other <code>*ast.CallExpression</code>. That means, first of all, getting to the function that's being called. If the <code>Function</code> field of an <code>*ast.CallExpression</code> contains an <code>*ast.Identifier</code>, then <code>Eval</code> tries to look up the identifier in the current environment. In our case here, looking up <code>quote</code> doesn't yield a result and we get the <code>identifier not found: quote</code> error message.</p>
+<p>A first approach would be to define a built-in function called <code>quote</code>. <code>Eval</code> would then find the function in the environment and try to call it. That's good, but the problem lies in <code>Eval</code>s default behaviour when calling functions. Remember what it does before it evaluates a function's body? <em>It evaluates the arguments of the call!</em> That's <em>exactly</em> what we don't want! <code>quote</code> is supposed to return its argument <em>unevaluated</em>.</p>
+<p>What we need to do instead is to change this existing part of <code>Eval</code> so it doesn't evaluate the argument in <code>quote</code> call expressions:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/evaluator.go</span>
+
+<span class="kw">func</span> Eval(node ast.Node, env *object.Environment) object.Object {
+  <span class="co">// [...]</span>
+    <span class="kw">case</span> *ast.CallExpression:
+        function := Eval(node.Function, env)
+        <span class="kw">if</span> isError(function) {
+            <span class="kw">return</span> function
+        }
+
+        args := evalExpressions(node.Arguments, env)
+        <span class="kw">if</span> <span class="bu">len</span>(args) == <span class="dv">1</span> &amp;&amp; isError(args[<span class="dv">0</span>]) {
+            <span class="kw">return</span> args[<span class="dv">0</span>]
+        }
+
+        <span class="kw">return</span> applyFunction(function, args)
+  <span class="co">// [...]</span>
+}</code></pre></div>
+<p>The <code>evalExpressions(node.Arguments, env)</code> expression is what we need to skip in case we're calling <code>quote</code>. Let's do that, let's short-circuit <code>Eval</code>:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/evaluator.go</span>
+
+<span class="kw">func</span> Eval(node ast.Node, env *object.Environment) object.Object {
+  <span class="co">// [...]</span>
+    <span class="kw">case</span> *ast.CallExpression:
+        <span class="kw">if</span> node.Function.TokenLiteral() == <span class="st">&quot;quote&quot;</span> {
+            <span class="kw">return</span> quote(node.Arguments[<span class="dv">0</span>])
+        }
+
+  <span class="co">// [...]</span>
+}</code></pre></div>
+<p>We simply check whether we have a call to <code>quote</code> at hand by checking the <code>TokenLiteral()</code> method of the call expressions <code>Function</code> field. Granted, that's not the most beautiful solution, but it's all that's needed and for now does the job.</p>
+<p>In case the call expression is indeed a <code>quote</code> call we pass the single argument to <code>quote</code> (remember, we said we'll only allow one argument to <code>quote</code>!) to a function that's also called <code>quote</code>. It looks like this:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote.go</span>
+
+<span class="kw">func</span> quote(node ast.Node) object.Object {
+    <span class="kw">return</span> &amp;object.Quote{Node: node}
+}</code></pre></div>
+<p>I hope you didn't expect more. We simply take the argument and wrap it in a newly allocated <code>*object.Quote</code> and return that. And, would you look at that, it makes our tests pass!</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+ok      monkey/evaluator        0.009s</code></pre></div>
+<p>Alright! <code>quote</code> works as expected. Great! Now we can start with the real fun stuff. Because <code>quote</code> is only the half of it and we need to build its partner in macro crime now: <code>unquote</code>.</p>
+<h2 id="unquote">5.4 - Unquote</h2>
+<p>You know what they say: there can be no light without the dark, no Vim without Emacs and no <code>quote</code> without <code>unquote</code>. Or something like that.</p>
+<p>If the idea behind <code>quote</code> is that its arguments are not evaluated and just stay <code>ast.Node</code>s, then <code>unquote</code> exists to punch holes in that idea. With <code>quote</code> we're telling <code>Eval</code>: <em>&quot;skip this part&quot;</em>. But with <code>unquote</code> we're adding <em>&quot;...except this one here, evaluate this&quot;</em>.</p>
+<p><code>unquote</code> allows us to evaluate expressions inside a call to <code>quote</code>. In practical terms: when we call <code>quote(8 + unquote(4 + 4))</code> we don't want a <code>ast.Node</code> representing <code>8 + unquote(4 + 4)</code> to be returned. Instead we want <code>8 + 8</code>, because <code>unquote</code> should evaluate its argument.</p>
+<p>Thankfully, it's pretty easy to turn this desired behaviour into a test case:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote_test.go</span>
+
+<span class="kw">func</span> TestQuoteUnquote(t *testing.T) {
+    tests := []<span class="kw">struct</span> {
+        input    <span class="dt">string</span>
+        expected <span class="dt">string</span>
+    }{
+        {
+            <span class="st">`quote(unquote(4))`</span>,
+            <span class="st">`4`</span>,
+        },
+        {
+            <span class="st">`quote(unquote(4 + 4))`</span>,
+            <span class="st">`8`</span>,
+        },
+        {
+            <span class="st">`quote(8 + unquote(4 + 4))`</span>,
+            <span class="st">`(8 + 8)`</span>,
+        },
+        {
+            <span class="st">`quote(unquote(4 + 4) + 8)`</span>,
+            <span class="st">`(8 + 8)`</span>,
+        },
+    }
+
+    <span class="kw">for</span> _, tt := <span class="kw">range</span> tests {
+        evaluated := testEval(tt.input)
+        quote, ok := evaluated.(*object.Quote)
+        <span class="kw">if</span> !ok {
+            t.Fatalf(<span class="st">&quot;expected *object.Quote. got=%T (%+v)&quot;</span>,
+                evaluated, evaluated)
+        }
+
+        <span class="kw">if</span> quote.Node == <span class="ot">nil</span> {
+            t.Fatalf(<span class="st">&quot;quote.Node is nil&quot;</span>)
+        }
+
+        <span class="kw">if</span> quote.Node.String() != tt.expected {
+            t.Errorf(<span class="st">&quot;not equal. got=%q, want=%q&quot;</span>,
+                quote.Node.String(), tt.expected)
+        }
+    }
+}</code></pre></div>
+<p>The mechanism here is the same as in the <code>TestQuote</code> function we wrote earlier. We pass <code>tt.input</code> to <code>testEval</code> and then compare the output of the quoted <code>ast.Node</code>s <code>String()</code> method against our <code>tt.expected</code> value. The difference is that we now we have <code>unquote</code> calls inside the calls to <code>quote</code>. That makes the tests fail, as expected:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+--- FAIL: TestQuoteUnquote (0.00s)
+  quote_unquote_test.go:88: not equal. got=&quot;unquote(4)&quot;, want=&quot;4&quot;
+  quote_unquote_test.go:88: not equal. got=&quot;unquote((4 + 4))&quot;, want=&quot;8&quot;
+  quote_unquote_test.go:88: not equal. got=&quot;(8 + unquote((4 + 4)))&quot;,\
+    want=&quot;(8 + 8)&quot;
+  quote_unquote_test.go:88: not equal. got=&quot;(unquote((4 + 4)) + 8)&quot;,\
+    want=&quot;(8 + 8)&quot;
+FAIL
+FAIL    monkey/evaluator        0.009s</code></pre></div>
+<p>Making them pass might seems easy. We already know how to evaluate things! How hard can it be to evaluate calls to <code>unquote</code>? We already have a <code>case</code> branch for <code>*ast.CallExpression</code> in place in <code>Eval</code>, we can add another conditional, just like we did for <code>quote</code>.</p>
+<p>But exactly therein lies the rub.</p>
+<p>We can't just tweak <code>Eval</code> again. Because we never call <code>Eval</code>! Remember: when we come across a <code>quote</code> call, its argument is wrapped inside an <code>*object.Quote</code> and, as desired, <em>not passed to <code>Eval</code></em>. And since <code>unquote</code> calls are only allowed inside the argument of a <code>quote</code> call, <code>Eval</code> will never come across them. We can't rely on the recursive nature of <code>Eval</code> to find <code>unquote</code> calls for us and evaluate them. We have to do it by hand.</p>
+<p>In other words: making the tests pass requires us to traverse the argument passed to <code>quote</code>, find the calls to <code>unquote</code> and <code>Eval</code> their arguments. The good news is that it's not hard to do. We already did it - in <code>Eval</code> - and now we need to do it again. With one small change: we need to modify nodes as we walk along the AST.</p>
+<h3 id="walking-the-tree">Walking the tree</h3>
+<p>The word &quot;modify&quot; requires some explanation. We start by traversing the AST, find calls to <code>unquote</code> and pass the argument of the call to <code>Eval</code>. Nothing is modified so far. Only after the argument is evaluated comes the &quot;modify&quot; part: we now want to replace the whole <code>*ast.CallExpression</code> involving <code>unquote</code> with the result of this call to <code>Eval</code>.</p>
+<p>The problem is that this means replacing an <code>*ast.CallExpression</code> with the return value of <code>Eval</code>, an <code>object.Object</code>. Our compiler won't allow that. The solution is to turn the result of the <code>unquote</code> call into a new AST node and replace (modify!) the existing call to <code>unquote</code> with this newly created AST node.</p>
+<p>Trust me, it'll make sense soon.</p>
+<p>In order for us to do all this by hand, without the help of <code>Eval</code>, and to make <code>unquote</code> work, we're going to build a generic function that allows us to do AST traversal with the possible modification and replacement of <code>ast.Node</code>s. It's generic and not <code>unquote</code>-specific, because we'll need it again later on, once we have <code>quote</code> and <code>unquote</code> in place and need to take care of macros. It also makes the code much nicer.</p>
+<p>Now, is there a better place to add such a function than our old friend, the <code>ast</code> package itself?</p>
+<h4 id="first-steps">First steps</h4>
+<p>Here is what we want the function to do:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify_test.go</span>
+
+<span class="kw">package</span> ast
+
+<span class="kw">import</span> (
+    <span class="st">&quot;reflect&quot;</span>
+    <span class="st">&quot;testing&quot;</span>
+)
+
+<span class="kw">func</span> TestModify(t *testing.T) {
+    one := <span class="kw">func</span>() Expression { <span class="kw">return</span> &amp;IntegerLiteral{Value: <span class="dv">1</span>} }
+    two := <span class="kw">func</span>() Expression { <span class="kw">return</span> &amp;IntegerLiteral{Value: <span class="dv">2</span>} }
+
+    turnOneIntoTwo := <span class="kw">func</span>(node Node) Node {
+        integer, ok := node.(*IntegerLiteral)
+        <span class="kw">if</span> !ok {
+            <span class="kw">return</span> node
+        }
+
+        <span class="kw">if</span> integer.Value != <span class="dv">1</span> {
+            <span class="kw">return</span> node
+        }
+
+        integer.Value = <span class="dv">2</span>
+        <span class="kw">return</span> integer
+    }
+
+    tests := []<span class="kw">struct</span> {
+        input    Node
+        expected Node
+    }{
+        {
+            one(),
+            two(),
+        },
+        {
+            &amp;Program{
+                Statements: []Statement{
+                    &amp;ExpressionStatement{Expression: one()},
+                },
+            },
+            &amp;Program{
+                Statements: []Statement{
+                    &amp;ExpressionStatement{Expression: two()},
+                },
+            },
+        },
+    }
+
+    <span class="kw">for</span> _, tt := <span class="kw">range</span> tests {
+        modified := Modify(tt.input, turnOneIntoTwo)
+
+        equal := reflect.DeepEqual(modified, tt.expected)
+        <span class="kw">if</span> !equal {
+            t.Errorf(<span class="st">&quot;not equal. got=%#v, want=%#v&quot;</span>,
+                modified, tt.expected)
+        }
+    }
+}</code></pre></div>
+<p>That's quite a test setup, so let's take a closer look at what we want to happen here.</p>
+<p>Before we define our <code>tests</code> we define two helper functions: <code>one</code> and <code>two</code>. Both return fresh <code>*ast.IntegerLiteral</code>s, which wrap the numbers <code>1</code> and <code>2</code> respectively. <code>one</code> and <code>two</code> exist so we don't have to construct integer literals again and again in the test cases themselves. That makes our tests slightly more readable.</p>
+<p>Next we define a function called <code>turnOneIntoTwo</code>. This one has an interesting interface: it accepts an <code>ast.Node</code> and returns an <code>ast.Node</code>. And it checks whether the passed-in <code>ast.Node</code> is an <code>*ast.IntegerLiteral</code> representing a <code>1</code>. If that's the case, it turns the <code>1</code> into a <code>2</code>. In other words: it &quot;modifies&quot; an <code>ast.Node</code>. It's easy to write and to understand. There's not much that can go wrong with it. That's why it's our simple test helper we pass to the yet-to-be-written-by-us function <code>ast.Modify</code> for each test case.</p>
+<p>In the first test case, the input consists solely of the node returned by <code>one</code>. We expect that passing this node along with <code>turnOneIntoTwo</code> to <code>Modify</code> turns it into a <code>two</code>. That's pretty simple: a node comes in and if it matches certain criteria it's modified and returned.</p>
+<p>In the second test case we expect more of <code>ast.Modify</code>: we want it to walk the given <code>ast.Program</code> tree and pass each child node to <code>turnOneIntoTwo</code>, which can then check if it's a <code>one</code> and turn it into a <code>two</code>.</p>
+<p>I bet you can already see how this relates to our use case of finding calls to <code>unquote</code> and replacing them with a new AST node.</p>
+<p>The tests fail, of course, because <code>ast.Modify</code> doesn't exist yet:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./ast
+# monkey/ast
+ast/modify_test.go:49: undefined: Modify
+FAIL    monkey/ast [build failed]</code></pre></div>
+<p>Thanks to the power of recursion (chant this three times for good luck!), making both test cases pass doesn't take a lot of code:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify.go</span>
+
+<span class="kw">type</span> ModifierFunc <span class="kw">func</span>(Node) Node
+
+<span class="kw">func</span> Modify(node Node, modifier ModifierFunc) Node {
+    <span class="kw">switch</span> node := node.(<span class="kw">type</span>) {
+
+    <span class="kw">case</span> *Program:
+        <span class="kw">for</span> i, statement := <span class="kw">range</span> node.Statements {
+            node.Statements[i], _ = Modify(statement, modifier).(Statement)
+        }
+
+    <span class="kw">case</span> *ExpressionStatement:
+        node.Expression, _ = Modify(node.Expression, modifier).(Expression)
+    }
+
+    <span class="kw">return</span> modifier(node)
+}</code></pre></div>
+<p>Yep, that's all it takes:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./ast
+ok      monkey/ast      0.007s</code></pre></div>
+<p>There are two ideas in <code>ast.Modify</code> that make it work.</p>
+<p>The first one: recursively walk down the children of any given <code>ast.Node</code>. That's what happens in the <code>switch</code> statement and we already know this mechanism from our <code>Eval</code> function. But here certain <code>ast.Node</code>s do not and won't have their own <code>case</code> branch, e.g. <code>*ast.IntegerLiteral</code>. That's because we can't traverse their children, even if we wanted to, because they don't have any. But if they have children, as is the case with <code>*ast.Program</code>, we call <code>ast.Modify</code> with each child, which again could result in calls to <code>ast.Modify</code> with the children of the child, and so on. Recursion, huh?</p>
+<p>An important effect of this recursive calling of <code>ast.Modify</code> is that we replace the node used as argument of the call with the node returned by the call. Which brings us to the second idea behind <code>ast.Modify</code>.</p>
+<p>On the last line of <code>ast.Modify</code> it calls the <code>modifier</code> with the given <code>Node</code> and <em>returns</em> the result. That's important. If we'd only call <code>modifier(node)</code> and then <code>return node</code>, we wouldn't be able to replace nodes in the AST, but only mutate them.</p>
+<p>The other effect of that last line is to stop the recursion. If we end up here, we don't have any more children we can traverse and return.</p>
+<h4 id="completing-the-walk">Completing the walk</h4>
+<p>With that, the architecture of <code>ast.Modify</code> is in place. Now we just need to fill in the blanks and complete it, so it can traverse a complete <code>*ast.Program</code> that contains every type of <code>ast.Node</code> that we have.</p>
+<p>Granted, what follows is not the most exciting part of our journey, but there are some subtleties to watch out for.</p>
+<h5 id="infix-expressions">Infix Expressions</h5>
+<p>The test cases for modifying infix expressions look like this:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify_test.go</span>
+
+<span class="kw">func</span> TestModify(t *testing.T) {
+<span class="co">// [...]</span>
+
+    tests := []<span class="kw">struct</span> {
+        input    Node
+        expected Node
+    }{
+<span class="co">// [...]</span>
+        {
+            &amp;InfixExpression{Left: one(), Operator: <span class="st">&quot;+&quot;</span>, Right: two()},
+            &amp;InfixExpression{Left: two(), Operator: <span class="st">&quot;+&quot;</span>, Right: two()},
+        },
+        {
+            &amp;InfixExpression{Left: two(), Operator: <span class="st">&quot;+&quot;</span>, Right: one()},
+            &amp;InfixExpression{Left: two(), Operator: <span class="st">&quot;+&quot;</span>, Right: two()},
+        },
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>The main point here is to make sure that <code>ast.Modify</code> traverses and possibly modifies both arms, <code>Left</code> and <code>Right</code>, of an <code>*ast.InfixExpression</code>. As of now, it doesn't:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./ast
+--- FAIL: TestModify (0.00s)
+        modify_test.go:62: not equal. got=&amp;ast.InfixExpression{[...]},\
+         want=&amp;ast.InfixExpression{[...]}
+        modify_test.go:62: not equal. got=&amp;ast.InfixExpression{[...]},\
+         want=&amp;ast.InfixExpression{[...]}
+FAIL
+FAIL    monkey/ast      0.006s</code></pre></div>
+<p>I've removed some parts of the failing test output here and replaced them with <code>[...]</code> to not waste space. I'll refrain from even showing the failing test output in the remainder of this section.</p>
+<p>The tests fail because the <code>one</code> integer literal hasn't been replaced with the <code>two</code>. Fixing that means adding a new <code>case</code> branch to <code>ast.Modify</code>:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify.go</span>
+
+<span class="kw">func</span> Modify(node Node, modifier ModifierFunc) Node {
+    <span class="kw">switch</span> node := node.(<span class="kw">type</span>) {
+
+<span class="co">// [...]</span>
+    <span class="kw">case</span> *InfixExpression:
+        node.Left, _ = Modify(node.Left, modifier).(Expression)
+        node.Right, _ = Modify(node.Right, modifier).(Expression)
+
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>That makes the tests pass and we can move on.</p>
+<h5 id="prefix-expressions">Prefix Expressions</h5>
+<p>This is the test case for prefix expressions:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify_test.go</span>
+
+<span class="kw">func</span> TestModify(t *testing.T) {
+<span class="co">// [...]</span>
+
+    tests := []<span class="kw">struct</span> {
+        input    Node
+        expected Node
+    }{
+<span class="co">// [...]</span>
+        {
+            &amp;PrefixExpression{Operator: <span class="st">&quot;-&quot;</span>, Right: one()},
+            &amp;PrefixExpression{Operator: <span class="st">&quot;-&quot;</span>, Right: two()},
+        },
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>And here is the <code>case</code> branch that makes them pass:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify.go</span>
+
+<span class="kw">func</span> Modify(node Node, modifier ModifierFunc) Node {
+    <span class="kw">switch</span> node := node.(<span class="kw">type</span>) {
+
+<span class="co">// [...]</span>
+    <span class="kw">case</span> *PrefixExpression:
+        node.Right, _ = Modify(node.Right, modifier).(Expression)
+
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<h5 id="index-expressions">Index Expressions</h5>
+<p>Index expressions also have two &quot;arms&quot;, which we need to check in the tests:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify_test.go</span>
+
+<span class="kw">func</span> TestModify(t *testing.T) {
+<span class="co">// [...]</span>
+
+    tests := []<span class="kw">struct</span> {
+        input    Node
+        expected Node
+    }{
+<span class="co">// [...]</span>
+        {
+            &amp;IndexExpression{Left: one(), Index: one()},
+            &amp;IndexExpression{Left: two(), Index: two()},
+        },
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>Walking the <code>Left</code> and <code>Index</code> nodes is easy enough:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify.go</span>
+
+<span class="kw">func</span> Modify(node Node, modifier ModifierFunc) Node {
+    <span class="kw">switch</span> node := node.(<span class="kw">type</span>) {
+
+<span class="co">// [...]</span>
+    <span class="kw">case</span> *IndexExpression:
+        node.Left, _ = Modify(node.Left, modifier).(Expression)
+        node.Index, _ = Modify(node.Index, modifier).(Expression)
+
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<h5 id="if-expression">If Expression</h5>
+<p>If-expression have quite a few moving parts that we need to traverse and possibly modify. They have the <code>Condition</code>, which can be any <code>ast.Expression</code>, and then they also have the <code>Consequence</code> and <code>Alternative</code> fields. Those are <code>*ast.BlockStatement</code>s, which themselves can contain an arbitrary number of <code>ast.Statement</code>s. The test case makes sure that all of these are traversed correctly:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify_test.go</span>
+
+<span class="kw">func</span> TestModify(t *testing.T) {
+<span class="co">// [...]</span>
+
+    tests := []<span class="kw">struct</span> {
+        input    Node
+        expected Node
+    }{
+<span class="co">// [...]</span>
+        {
+            &amp;IfExpression{
+                Condition: one(),
+                Consequence: &amp;BlockStatement{
+                    Statements: []Statement{
+                        &amp;ExpressionStatement{Expression: one()},
+                    },
+                },
+                Alternative: &amp;BlockStatement{
+                    Statements: []Statement{
+                        &amp;ExpressionStatement{Expression: one()},
+                    },
+                },
+            },
+            &amp;IfExpression{
+                Condition: two(),
+                Consequence: &amp;BlockStatement{
+                    Statements: []Statement{
+                        &amp;ExpressionStatement{Expression: two()},
+                    },
+                },
+                Alternative: &amp;BlockStatement{
+                    Statements: []Statement{
+                        &amp;ExpressionStatement{Expression: two()},
+                    },
+                },
+            },
+        },
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>Thankfully, making this test case green takes a lot less lines:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify.go</span>
+
+<span class="kw">func</span> Modify(node Node, modifier ModifierFunc) Node {
+    <span class="kw">switch</span> node := node.(<span class="kw">type</span>) {
+
+<span class="co">// [...]</span>
+    <span class="kw">case</span> *IfExpression:
+        node.Condition, _ = Modify(node.Condition, modifier).(Expression)
+        node.Consequence, _ = Modify(node.Consequence, modifier).(*BlockStatement)
+        <span class="kw">if</span> node.Alternative != <span class="ot">nil</span> {
+            node.Alternative, _ = Modify(node.Alternative, modifier).(*BlockStatement)
+        }
+
+    <span class="kw">case</span> *BlockStatement:
+        <span class="kw">for</span> i, _ := <span class="kw">range</span> node.Statements {
+            node.Statements[i], _ = Modify(node.Statements[i], modifier).(Statement)
+        }
+
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<h5 id="return-statement">Return Statement</h5>
+<p>Return statements have one child: the <code>ReturnValue</code>, which is an <code>ast.Expression</code>.</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify_test.go</span>
+
+<span class="kw">func</span> TestModify(t *testing.T) {
+<span class="co">// [...]</span>
+
+    tests := []<span class="kw">struct</span> {
+        input    Node
+        expected Node
+    }{
+<span class="co">// [...]</span>
+        {
+            &amp;ReturnStatement{ReturnValue: one()},
+            &amp;ReturnStatement{ReturnValue: two()},
+        },
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>That's a cute little test case, isn't it? Now take a look at this super cute <code>case</code> branch that makes it pass:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify.go</span>
+
+<span class="kw">func</span> Modify(node Node, modifier ModifierFunc) Node {
+    <span class="kw">switch</span> node := node.(<span class="kw">type</span>) {
+
+<span class="co">// [...]</span>
+    <span class="kw">case</span> *ReturnStatement:
+        node.ReturnValue, _ = Modify(node.ReturnValue, modifier).(Expression)
+
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>I know, I know. This is not &quot;super cute&quot; and frankly this is getting boring. We're nearly done, though. I promise.</p>
+<h5 id="let-statement">Let Statement</h5>
+<p>Let statements also only have one moving part: the <code>Value</code> they're binding to a name.</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify_test.go</span>
+
+<span class="kw">func</span> TestModify(t *testing.T) {
+<span class="co">// [...]</span>
+
+    tests := []<span class="kw">struct</span> {
+        input    Node
+        expected Node
+    }{
+<span class="co">// [...]</span>
+        {
+            &amp;LetStatement{Value: one()},
+            &amp;LetStatement{Value: two()},
+        },
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>The <code>case</code> branch for <code>*ast.LetStatement</code> passes this <code>Value</code> to the <code>modifier</code> function:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify.go</span>
+
+<span class="kw">func</span> Modify(node Node, modifier ModifierFunc) Node {
+    <span class="kw">switch</span> node := node.(<span class="kw">type</span>) {
+
+<span class="co">// [...]</span>
+    <span class="kw">case</span> *LetStatement:
+        node.Value, _ = Modify(node.Value, modifier).(Expression)
+
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>Whew! We're done with statements! Let's take care of more literals!</p>
+<h5 id="function-literal">Function Literal</h5>
+<p>Function literals have a <code>Body</code>, which is an <code>*ast.BlockStatement</code>, and <code>Parameters</code>, which are a slice of <code>*ast.Identifier</code>s. Traversing these parameters is optional, strictly speaking. The <code>ast.ModifierFunc</code> could do that itself, since it gets passed the function literal and the parameters can't contain any more children. But because we're nice we'll take care that, even though we can't easily test this here:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify_test.go</span>
+
+<span class="kw">func</span> TestModify(t *testing.T) {
+<span class="co">// [...]</span>
+
+    tests := []<span class="kw">struct</span> {
+        input    Node
+        expected Node
+    }{
+<span class="co">// [...]</span>
+        {
+            &amp;FunctionLiteral{
+                Parameters: []*Identifier{},
+                Body: &amp;BlockStatement{
+                    Statements: []Statement{
+                        &amp;ExpressionStatement{Expression: one()},
+                    },
+                },
+            },
+            &amp;FunctionLiteral{
+                Parameters: []*Identifier{},
+                Body: &amp;BlockStatement{
+                    Statements: []Statement{
+                        &amp;ExpressionStatement{Expression: two()},
+                    },
+                },
+            },
+        },
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>Since we already have a <code>case</code> branch for <code>*ast.BlockStatement</code>, it doesn't take a lot of lines to make this new test case pass:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify.go</span>
+
+<span class="kw">func</span> Modify(node Node, modifier ModifierFunc) Node {
+    <span class="kw">switch</span> node := node.(<span class="kw">type</span>) {
+
+<span class="co">// [...]</span>
+    <span class="kw">case</span> *FunctionLiteral:
+        <span class="kw">for</span> i, _ := <span class="kw">range</span> node.Parameters {
+            node.Parameters[i], _ = Modify(node.Parameters[i], modifier).(*Identifier)
+        }
+        node.Body, _ = Modify(node.Body, modifier).(*BlockStatement)
+
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<h5 id="array-literal">Array Literal</h5>
+<p>Array literals are comma-separated lists of expressions. We only have to test that all of the expressions are iterated and passed to <code>ast.Modify</code> correctly:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify_test.go</span>
+
+<span class="kw">func</span> TestModify(t *testing.T) {
+<span class="co">// [...]</span>
+
+    tests := []<span class="kw">struct</span> {
+        input    Node
+        expected Node
+    }{
+<span class="co">// [...]</span>
+        {
+            &amp;ArrayLiteral{Elements: []Expression{one(), one()}},
+            &amp;ArrayLiteral{Elements: []Expression{two(), two()}},
+        },
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>A loop is all it takes to make this test case pass:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify.go</span>
+
+<span class="kw">func</span> Modify(node Node, modifier ModifierFunc) Node {
+    <span class="kw">switch</span> node := node.(<span class="kw">type</span>) {
+
+<span class="co">// [...]</span>
+    <span class="kw">case</span> *ArrayLiteral:
+        <span class="kw">for</span> i, _ := <span class="kw">range</span> node.Elements {
+            node.Elements[i], _ = Modify(node.Elements[i], modifier).(Expression)
+        }
+
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<h5 id="hash-literal">Hash Literal</h5>
+<p>Hash literals have one field we have to traverse, called <code>Pairs</code>, which is a <code>map[Expression]Expression</code>. That means we have to iterate over the map and modify both the keys and the values of the map, since both could contain a node we want to modify.</p>
+<p>That itself is not a problem, but the test for this does not fit into our existing framework. Due to the way <code>reflect.DeepEqual</code> works with maps having pointers for keys and values, which I'll not get into here, we need a separate section for <code>*ast.HashLiteral</code>s at the end of <code>TestModify</code> that doesn't use <code>reflect.DeepEqual</code>:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify_test.go</span>
+
+<span class="kw">func</span> TestModify(t *testing.T) {
+<span class="co">// [...]</span>
+
+    hashLiteral := &amp;HashLiteral{
+        Pairs: <span class="kw">map</span>[Expression]Expression{
+            one(): one(),
+            one(): one(),
+        },
+    }
+
+    Modify(hashLiteral, turnOneIntoTwo)
+
+    <span class="kw">for</span> key, val := <span class="kw">range</span> hashLiteral.Pairs {
+        key, _ := key.(*IntegerLiteral)
+        <span class="kw">if</span> key.Value != <span class="dv">2</span> {
+            t.Errorf(<span class="st">&quot;value is not %d, got=%d&quot;</span>, <span class="dv">2</span>, key.Value)
+        }
+        val, _ := val.(*IntegerLiteral)
+        <span class="kw">if</span> val.Value != <span class="dv">2</span> {
+            t.Errorf(<span class="st">&quot;value is not %d, got=%d&quot;</span>, <span class="dv">2</span>, val.Value)
+        }
+    }
+}</code></pre></div>
+<p>Even though this is new, it's easy to understand for us. We create a new <code>*ast.HashLiteral</code> with only <code>one</code>s in its <code>Pairs</code>. This hash literal is then passed to <code>ast.Modify</code>, after which we assert, by hand, that every <code>one</code> has been effectively turned into a <code>two</code>. At the moment this doesn't work:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./ast
+--- FAIL: TestModify (0.00s)
+  modify_test.go:146: value is not 2, got=1
+  modify_test.go:150: value is not 2, got=1
+  modify_test.go:146: value is not 2, got=1
+  modify_test.go:150: value is not 2, got=1
+FAIL
+FAIL    monkey/ast      0.007s</code></pre></div>
+<p>The fix for this involves creating a new <code>map[Expression]Expression</code> we can replace <code>Pairs</code> with:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/modify.go</span>
+
+<span class="kw">func</span> Modify(node Node, modifier ModifierFunc) Node {
+    <span class="kw">switch</span> node := node.(<span class="kw">type</span>) {
+
+<span class="co">// [...]</span>
+    <span class="kw">case</span> *HashLiteral:
+        newPairs := <span class="bu">make</span>(<span class="kw">map</span>[Expression]Expression)
+        <span class="kw">for</span> key, val := <span class="kw">range</span> node.Pairs {
+            newKey, _ := Modify(key, modifier).(Expression)
+            newVal, _ := Modify(val, modifier).(Expression)
+            newPairs[newKey] = newVal
+        }
+        node.Pairs = newPairs
+
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>That makes the tests pass:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./ast
+ok      monkey/ast      0.006s</code></pre></div>
+<p>And with that our new <code>ast.Modify</code> function is done! Whew! We can now move on. But before we do, I need to tell you something.</p>
+<h4 id="underscores-are-todos">Underscores are TODOs</h4>
+<p>Error handling! Let's make this quick: we straight up ignored it. Instead of making sure that our type assertions in <code>ast.Modify</code> work, we simply used the dreaded <code>_</code> to ignore possible errors. Of course, that's not how it <em>should</em> be done and the reason why it's not done correctly is ... space. I decided that it takes up too much space to show the complete error handling here, which would be full of rather boring conditionals and boolean checks.</p>
+<p>So, before we go outside to dance and sing songs about our how our <code>ast.Modify</code> is finally working, please keep the <code>_</code> of <code>ast.Modify</code> in the back of your mind.</p>
+<p>That being said: yes! We did it! We successfully built <code>ast.Modify</code>!</p>
+<h3 id="replacing-unquote-calls">Replacing Unquote Calls</h3>
+<p>With <code>ast.Modify</code> in place and fully tested, we can now turn our attention back to our original task. Remember? We need to evaluate <code>unquote</code> arguments in unevaluated, <code>quote</code>ed <code>ast.Node</code>s. If that doesn't jog your memory, maybe this still failing test does:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+--- FAIL: TestQuoteUnquote (0.00s)
+  quote_unquote_test.go:88: not equal. got=&quot;unquote(4)&quot;, want=&quot;4&quot;
+  quote_unquote_test.go:88: not equal. got=&quot;unquote((4 + 4))&quot;, want=&quot;8&quot;
+  quote_unquote_test.go:88: not equal. got=&quot;(8 + unquote((4 + 4)))&quot;,\
+    want=&quot;(8 + 8)&quot;
+  quote_unquote_test.go:88: not equal. got=&quot;(unquote((4 + 4)) + 8)&quot;,\
+    want=&quot;(8 + 8)&quot;
+FAIL
+FAIL    monkey/evaluator        0.007s</code></pre></div>
+<p>So, what do we have to do to make <code>TestQuoteUnquote</code> pass? Thinking in terms of <code>ast.Modify</code> this is fairly easy to articulate. Whenever we <code>quote</code> an <code>ast.Node</code> we need to pass it to <code>ast.Modify</code> first. The second argument to <code>ast.Modify</code>, an <code>ast.ModifierFunc</code>, then needs to replace calls to <code>unquote</code>.</p>
+<p>Let's take a first step:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote.go</span>
+
+<span class="kw">import</span> (
+    <span class="st">&quot;monkey/ast&quot;</span>
+    <span class="st">&quot;monkey/object&quot;</span>
+)
+
+<span class="kw">func</span> quote(node ast.Node) object.Object {
+    node = evalUnquoteCalls(node)
+    <span class="kw">return</span> &amp;object.Quote{Node: node}
+}
+
+<span class="kw">func</span> evalUnquoteCalls(quoted ast.Node) ast.Node {
+    <span class="kw">return</span> ast.Modify(quoted, <span class="kw">func</span>(node ast.Node) ast.Node {
+        <span class="kw">if</span> !isUnquoteCall(node) {
+            <span class="kw">return</span> node
+        }
+
+        call, ok := node.(*ast.CallExpression)
+        <span class="kw">if</span> !ok {
+            <span class="kw">return</span> node
+        }
+
+        <span class="kw">if</span> <span class="bu">len</span>(call.Arguments) != <span class="dv">1</span> {
+            <span class="kw">return</span> node
+        }
+
+        <span class="kw">return</span> node
+    })
+}
+
+<span class="kw">func</span> isUnquoteCall(node ast.Node) <span class="dt">bool</span> {
+    callExpression, ok := node.(*ast.CallExpression)
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> <span class="ot">false</span>
+    }
+
+    <span class="kw">return</span> callExpression.Function.TokenLiteral() == <span class="st">&quot;unquote&quot;</span>
+}</code></pre></div>
+<p>The change to our existing <code>quote</code> function is minimal. We simply pass the <code>node</code> to the new <code>evalUnquoteCalls</code> function before it's quoted.</p>
+<p><code>evalUnquoteCalls</code> then uses <code>ast.Modify</code> to traverse every <code>ast.Node</code> contained in the <code>quoted</code> parameter. And the <code>ast.ModifierFunc</code> checks if any given <code>ast.Node</code> is a call to <code>unquote</code> with one argument. That's right, for now the modifier function doesn't really do anything. It just checks which <code>node</code> it received; it doesn't modify anything! And, well, that's not enough to make the tests pass:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+--- FAIL: TestQuoteUnquote (0.00s)
+  quote_unquote_test.go:88: not equal. got=&quot;unquote(4)&quot;, want=&quot;4&quot;
+  quote_unquote_test.go:88: not equal. got=&quot;unquote((4 + 4))&quot;, want=&quot;8&quot;
+  quote_unquote_test.go:88: not equal. got=&quot;(8 + unquote((4 + 4)))&quot;,\
+    want=&quot;(8 + 8)&quot;
+  quote_unquote_test.go:88: not equal. got=&quot;(unquote((4 + 4)) + 8)&quot;,\
+    want=&quot;(8 + 8)&quot;
+FAIL
+FAIL    monkey/evaluator        0.007s</code></pre></div>
+<p>What do we need to do once we find an <code>unquote</code> call? <code>unquote</code> exists to punch holes into <code>quote</code>. That means that in contrast to <code>quote</code>, which stops its argument from being evaluated, it instead should evaluate it! And we already know how to do that -- with a call to <code>Eval</code>!</p>
+<p>But in order to use <code>Eval</code> we also need an <code>*object.Environment</code>, in which we can evaluate nodes. We have one at hand when <code>quote</code> is called, we just need to pass it through. For that we first we have to change our <code>case</code> branch in <code>Eval</code> and add the additional argument to the call to <code>quote</code>:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/evaluator.go</span>
+
+<span class="kw">func</span> Eval(node ast.Node, env *object.Environment) object.Object {
+<span class="co">// [...]</span>
+
+    <span class="kw">case</span> *ast.CallExpression:
+        <span class="kw">if</span> node.Function.TokenLiteral() == <span class="st">&quot;quote&quot;</span> {
+            <span class="kw">return</span> quote(node.Arguments[<span class="dv">0</span>], env)
+        }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>Now we can change the signature of <code>quote</code> and pass <code>env</code> on to <code>evalUnquoteCalls</code>:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote.go</span>
+
+<span class="kw">func</span> quote(node ast.Node, env *object.Environment) object.Object {
+    node = evalUnquoteCalls(node, env)
+    <span class="kw">return</span> &amp;object.Quote{Node: node}
+}</code></pre></div>
+<p>And in the anonymous function in <code>evalUnquoteCalls</code> we can finally call <code>Eval</code> with the passed in <code>env</code>:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote.go</span>
+
+<span class="kw">func</span> evalUnquoteCalls(quoted ast.Node, env *object.Environment) ast.Node {
+    <span class="kw">return</span> ast.Modify(quoted, <span class="kw">func</span>(node ast.Node) ast.Node {
+<span class="co">// [...]</span>
+
+        <span class="kw">return</span> Eval(call.Arguments[<span class="dv">0</span>], env)
+    })
+}</code></pre></div>
+<p>Perfect! Except that this doesn't work. The compiler rightfully refuses to accept our files:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+# monkey/evaluator
+evaluator/quote_unquote.go:28: cannot use Eval(call.Arguments[0], env)\
+  (type object.Object) as type ast.Node in return argument:
+        object.Object does not implement ast.Node (missing String method)
+FAIL    monkey/evaluator [build failed]</code></pre></div>
+<p>Just like we predicted it would earlier in this chapter. The newly inserted call to <code>Eval</code> returns an <code>object.Object</code>. And that doesn't work as the return value of our <code>ast.ModifierFunc</code>, which must return an <code>ast.Node</code>. We have an <code>object.Object</code> at hand but need an <code>ast.Node</code>.</p>
+<p>Solving this is the last piece in the quote/unquote puzzle. Let's take a step back here and analyze what we need to do.</p>
+<p>Our Go function <code>quote</code> returns an <code>*object.Quote</code>, containing an unevaluated <code>ast.Node</code>. Inside this unevaluated node the Monkey function <code>unquote</code> can be called to evaluate expressions. This works by evaluating the argument of the <code>unquote</code> call and replacing the whole call expression, an <code>ast.Node</code>, with the result of that evaluation. That result is an <code>object.Object</code>, which <code>Eval</code> returns.</p>
+<p>That means, in order to replace the <code>unquote</code> call and to insert the result back into the unevaluated <code>ast.Node</code>, we have to convert it into an <code>ast.Node</code> again!</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote.go</span>
+
+<span class="kw">import</span> (
+<span class="co">// [...]</span>
+    <span class="st">&quot;fmt&quot;</span>
+    <span class="st">&quot;monkey/token&quot;</span>
+)
+
+<span class="kw">func</span> evalUnquoteCalls(quoted ast.Node, env *object.Environment) ast.Node {
+    <span class="kw">return</span> ast.Modify(quoted, <span class="kw">func</span>(node ast.Node) ast.Node {
+<span class="co">// [...]</span>
+
+        unquoted := Eval(call.Arguments[<span class="dv">0</span>], env)
+        <span class="kw">return</span> convertObjectToASTNode(unquoted)
+    })
+}
+
+<span class="kw">func</span> convertObjectToASTNode(obj object.Object) ast.Node {
+    <span class="kw">switch</span> obj := obj.(<span class="kw">type</span>) {
+    <span class="kw">case</span> *object.Integer:
+        t := token.Token{
+            Type:    token.INT,
+            Literal: fmt.Sprintf(<span class="st">&quot;%d&quot;</span>, obj.Value),
+        }
+        <span class="kw">return</span> &amp;ast.IntegerLiteral{Token: t, Value: obj.Value}
+
+    <span class="kw">default</span>:
+        <span class="kw">return</span> <span class="ot">nil</span>
+    }
+}</code></pre></div>
+<p>The new <code>convertObjectToASTNode</code> function creates <code>ast.Node</code>s that represent the given <code>obj</code>. It also has to create a matching <code>token.Token</code>, or otherwise our tests would break (since the <code>String()</code> methods of our <code>ast.Node</code>s heavily rely on the tokens). That's not the best of reasons and the constructions of the tokens is maybe best not done here, but it's one of the trade-offs we're making. Because besides the tokens, we're also ignoring possible errors and just return <code>nil</code>. But, you know, exercise for the reader and not dwelling on mistakes and all that...</p>
+<p>Yes, that makes the tests pass!</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+ok      monkey/evaluator        0.009s</code></pre></div>
+<p><code>quote</code> and <code>unquote</code> work! We can now stop source code from being evaluated by using <code>quote</code> and we can make exceptions from that by evaluating certain nodes with <code>unquote</code>. Fantastic!</p>
+<p>And that's not even all of i! There's a hidden feature. You may have noticed that in <code>evalUnquoteCalls</code> we have access to the current environment of the <code>quote</code> call, <code>env</code>, and then pass that to the <code>Eval</code> call in our <code>ast.ModifierFunc</code>. Yes, that allows us to do environment-aware evaluation inside <code>unquote</code> calls. Here are two test cases for <code>TestQuoteUnquote</code> that show what this makes possible:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote_test.go</span>
+
+<span class="kw">func</span> TestQuoteUnquote(t *testing.T) {
+    tests := []<span class="kw">struct</span> {
+        input    <span class="dt">string</span>
+        expected <span class="dt">string</span>
+    }{
+<span class="co">// [...]</span>
+        {
+            <span class="st">`let foobar = 8;</span>
+<span class="st">            quote(foobar)`</span>,
+            <span class="st">`foobar`</span>,
+        },
+        {
+            <span class="st">`let foobar = 8;</span>
+<span class="st">            quote(unquote(foobar))`</span>,
+            <span class="st">`8`</span>,
+        },
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>In the first test we make sure that quoting an identifier doesn't resolve it, i.e. doesn't evaluate it. That's the sanity check.</p>
+<p>But in the second test we use <code>unquote</code> to evaluate the identifier <code>foobar</code> with the <code>env</code> of the test passed to <code>Eval</code>. That in turn resolves the identifier and returns the object it's bound to. And that object then gets turned back into an AST node. Amazing, isn't it? The fact that we have the environment at our hands gives us quite a lot more power later on.</p>
+<p>The only problem is that <code>convertObjectToASTNode</code> only knows how to convert integers back to AST nodes. Let's add some more tests and extend <code>convertObjectToASTNode</code> so that it can at least convert more than one type of object.</p>
+<h4 id="converting-booleans-to-ast-nodes">Converting booleans to AST nodes</h4>
+<p>Turning an <code>*oject.Boolean</code> back into an <code>ast.Node</code> is nearly as easy as turning integers into AST nodes. Here are two tests that make sure that we can handle the <code>true</code> literal and that we can also handle boolean results of expressions:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote_test.go</span>
+
+<span class="kw">func</span> TestQuoteUnquote(t *testing.T) {
+    tests := []<span class="kw">struct</span> {
+        input    <span class="dt">string</span>
+        expected <span class="dt">string</span>
+    }{
+<span class="co">// [...]</span>
+        {
+            <span class="st">`quote(unquote(true))`</span>,
+            <span class="st">`true`</span>,
+        },
+        {
+            <span class="st">`quote(unquote(true == false))`</span>,
+            <span class="st">`false`</span>,
+        },
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>The test fails because <code>convertObjectToASTNode</code> doesn't know how to handle booleans yet:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+--- FAIL: TestQuoteUnquote (0.00s)
+  quote_unquote_test.go:101: quote.Node is nil
+FAIL
+FAIL    monkey/evaluator        0.009s</code></pre></div>
+<p>All we need to do is to add another <code>case</code> branch to the <code>switch</code> statement in <code>convertObjectToASTNode</code>:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote.go</span>
+
+<span class="kw">func</span> convertObjectToASTNode(obj object.Object) ast.Node {
+    <span class="kw">switch</span> obj := obj.(<span class="kw">type</span>) {
+<span class="co">// [...]</span>
+
+    <span class="kw">case</span> *object.Boolean:
+        <span class="kw">var</span> t token.Token
+        <span class="kw">if</span> obj.Value {
+            t = token.Token{Type: token.TRUE, Literal: <span class="st">&quot;true&quot;</span>}
+        } <span class="kw">else</span> {
+            t = token.Token{Type: token.FALSE, Literal: <span class="st">&quot;false&quot;</span>}
+        }
+        <span class="kw">return</span> &amp;ast.Boolean{Token: t, Value: obj.Value}
+<span class="co">// [...]</span>
+    }
+}</code></pre></div>
+<p>The tests pass. And I'm pretty sure that we now won't have any problems adding more types of objects to <code>convertObjectToASTNode</code>. There is one possible addition, though, that is so neat that I <em>have</em> to show it to you.</p>
+<h4 id="quote-inside-unquote-inside-quote">Quote inside unquote inside quote</h4>
+<p>Here's the idea: we can add support for <code>quote</code> calls inside <code>unquote</code> inside <code>quote</code> solely by modifying <code>convertObjectToASTNode</code>. Cool, right? Alright, granted, &quot;unquoting quoted source code inside quoted source code&quot; is a great title for a book about meta-programming, but not a great explanation of what I mean.</p>
+<p>Let me show you the tests for this. They provide some clarity:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote_test.go</span>
+
+<span class="kw">func</span> TestQuoteUnquote(t *testing.T) {
+    tests := []<span class="kw">struct</span> {
+        input    <span class="dt">string</span>
+        expected <span class="dt">string</span>
+    }{
+<span class="co">// [...]</span>
+        {
+            <span class="st">`quote(unquote(quote(4 + 4)))`</span>,
+            <span class="st">`(4 + 4)`</span>,
+        },
+        {
+            <span class="st">`let quotedInfixExpression = quote(4 + 4);</span>
+<span class="st">            quote(unquote(4 + 4) + unquote(quotedInfixExpression))`</span>,
+            <span class="st">`(8 + (4 + 4))`</span>,
+        },
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>In both test cases we first quote an infix expression, <code>4 + 4</code>, and then use it as an argument to call <code>unquote</code>, which itself is the argument of the outer <code>quote</code> call.</p>
+<p>Especially the second test case makes clear what we want from this feature: passing quoted source code around. Adding support for previously <code>quote</code>d source code to <code>unquote</code> allows us to build up <code>ast.Node</code>s from multiple other <code>ast.Node</code>s. That'll come in handy soon enough, when we start building macros, which make use of this exact mechanism.</p>
+<p>But first, we have to fix the failing tests, because <code>unquote</code> can't handle <code>*object.Quote</code> yet:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+--- FAIL: TestQuoteUnquote (0.00s)
+  quote_unquote_test.go:110: quote.Node is nil
+FAIL
+FAIL    monkey/evaluator        0.007s</code></pre></div>
+<p>And here is what makes them pass and this addition so neat:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/quote_unquote.go</span>
+
+<span class="kw">func</span> convertObjectToASTNode(obj object.Object) ast.Node {
+    <span class="kw">switch</span> obj := obj.(<span class="kw">type</span>) {
+<span class="co">// [...]</span>
+
+    <span class="kw">case</span> *object.Quote:
+        <span class="kw">return</span> obj.Node
+
+<span class="co">// [...]</span>
+    }
+}</code></pre></div>
+<p>Two lines. It really is neat, isn't it? And if you don't understand how and why this <code>quote(unquote(quote()))</code> business works the way it does: worry not, that's normal, it takes a few glances to wrap ones head around.</p>
+<p>Before we move on to the finale of our excursion into the world of meta-programming and macro systems - the macro expansion phase - I feel obliged to point out a few things our <code>quote/unquote</code> system is missing.</p>
+<h4 id="words-of-caution">Words of Caution</h4>
+<p>It's simply outside the scope here, but what we're missing is the <em>proper</em> modification of AST nodes. At the moment <code>ast.Modify</code> simply modifies child nodes, but doesn't update the <code>Token</code> fields of the parent nodes. That leads to an inconsistent AST with nodes that may output the wrong information in their <code>String()</code> methods or even lead to bugs.</p>
+<p>In <code>convertObjectToASTNode</code> we create new tokens on the fly. That's not a problem at the moment, but if our tokens would contain information about their origin, such as filename or line number, then we'd also have to update these here, which might be quite difficult for tokens that are created dynamically.</p>
+<p>And, of course, the error handling, too, is neither &quot;proper&quot; nor &quot;defensive&quot;, but rather &quot;fingers crossed&quot;.</p>
+<p>Alright, now that I've done my duty and warned you about the things lurking in the shadows, we're ready to walk through the final gate of macro systems and build our macro expansion phase.</p>
+<h2 id="macro-expansion">5.5 - Macro Expansion</h2>
+<p>We interpret Monkey source code in a series of steps. We first give it to our lexer to turn it into tokens. Then comes the parser and turns the tokens into an AST. Finally, <code>Eval</code> takes this AST and evaluates its nodes recursively, statement by statement, expression by expression. That's three separate steps or phases. Lexing, parsing and evaluation. Speaking in data structures: strings to tokens, tokens to AST, AST to output.</p>
+<p>What we're going to do next is add another phase. The macro expansion phase. It will sit right between the second and third one, between parsing and evaluation. And it couldn't sit anywhere else; there's a necessity to this position. The reason for that lies in the meaning of &quot;macro expansion&quot;.</p>
+<p>Conceptually, &quot;macro expansion&quot; means evaluating all calls to macros in the source code and replacing them with the return value of this evaluation. Macros take source code as their input and return source code, so by calling them we &quot;expand&quot; the source code, because each call might result in more of it.</p>
+<p>For that to work, we need the source code in an accessible form. That's only the case after the parser did its job and we have an AST at hand. So that's why macro expansion happens after the parsing step. And it happens before the evaluation phase, because... well, otherwise it would be too late. There's no point in modifying source code that's not going to be evaluated again.</p>
+<p>Translating this to data structures again: where the lexing phase turns strings into tokens and the parsing phase turns tokens into an AST, the macro expansion phase takes the AST, modifies it and returns it before it's evaluated.</p>
+<p>Alright! That's the idea behind the macro expansion phase. Now, how are we going to do that? Step by step, because there are two of them.</p>
+<p>The first thing we have to do is traverse our AST and find all the macro definitions. A macro definition is nothing more than a let statement in which the value is a macro literal, so we shouldn't have too much trouble with that.</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="kw">let</span> myMacro <span class="op">=</span> <span class="at">macro</span>(x<span class="op">,</span> y) <span class="op">{</span> <span class="at">quote</span>(<span class="at">unquote</span>(x) <span class="op">+</span> <span class="at">unquote</span>(y))<span class="op">;</span> <span class="op">}</span></code></pre></div>
+<p>Once we've found such a macro definition, we have to extract it. That means removing it from the AST and saving it, so we can access it later. The removal is necessary, because otherwise we'd trip over the macros later on in the evaluation phase.</p>
+<p>The second step we have to take then is find <em>the calls to those macros</em> and evaluate them. That comes pretty close to what we're already doing with function calls in <code>Eval</code>. The important difference, as you already know, is that in this phase we don't evaluate the arguments of the call before we evaluate the body. We access them in the macro's body as unevaluated <code>ast.Node</code>s. That's what makes macros different from normal functions; macros work with the unevaluated AST.</p>
+<p>Once evaluated we have to reinsert the result of the macro calls into the AST, just like we did with <code>unquote</code>, except that now we won't have to convert the return value into an <code>ast.Node</code>. Macros already return AST nodes.</p>
+<p>Alright! Let's get cracking and start by making and finding macro definitions.</p>
+<h3 id="the-macro-keyword">The Macro Keyword</h3>
+<p>First things first: in order for us to use the <code>macro</code> keyword, we have to teach our lexer about it. That means we have to add a new token type and return the correct token in the lexing process. Let's start with the token type:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// token/token.go</span>
+
+<span class="kw">const</span> (
+<span class="co">// [...]</span>
+
+    MACRO = <span class="st">&quot;MACRO&quot;</span>
+)</code></pre></div>
+<p>Now we can add a test to our lexer to make sure that lexing macro literals works as intended:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// lexer/lexer_test.go</span>
+
+<span class="kw">func</span> TestNextToken(t *testing.T) {
+    input := <span class="st">`let five = 5;</span>
+<span class="st">let ten = 10;</span>
+
+<span class="st">let add = fn(x, y) {</span>
+<span class="st">  x + y;</span>
+<span class="st">};</span>
+
+<span class="st">let result = add(five, ten);</span>
+<span class="st">!-/*5;</span>
+<span class="st">5 &lt; 10 &gt; 5;</span>
+
+<span class="st">if (5 &lt; 10) {</span>
+<span class="st">    return true;</span>
+<span class="st">} else {</span>
+<span class="st">    return false;</span>
+<span class="st">}</span>
+
+<span class="st">10 == 10;</span>
+<span class="st">10 != 9;</span>
+<span class="st">&quot;foobar&quot;</span>
+<span class="st">&quot;foo bar&quot;</span>
+<span class="st">[1, 2];</span>
+<span class="st">{&quot;foo&quot;: &quot;bar&quot;}</span>
+<span class="st">macro(x, y) { x + y; };</span>
+<span class="st">`</span>
+
+    tests := []<span class="kw">struct</span> {
+        expectedType    token.TokenType
+        expectedLiteral <span class="dt">string</span>
+    }{
+<span class="co">// [...]</span>
+        {token.MACRO, <span class="st">&quot;macro&quot;</span>},
+        {token.LPAREN, <span class="st">&quot;(&quot;</span>},
+        {token.IDENT, <span class="st">&quot;x&quot;</span>},
+        {token.COMMA, <span class="st">&quot;,&quot;</span>},
+        {token.IDENT, <span class="st">&quot;y&quot;</span>},
+        {token.RPAREN, <span class="st">&quot;)&quot;</span>},
+        {token.LBRACE, <span class="st">&quot;{&quot;</span>},
+        {token.IDENT, <span class="st">&quot;x&quot;</span>},
+        {token.PLUS, <span class="st">&quot;+&quot;</span>},
+        {token.IDENT, <span class="st">&quot;y&quot;</span>},
+        {token.SEMICOLON, <span class="st">&quot;;&quot;</span>},
+        {token.RBRACE, <span class="st">&quot;}&quot;</span>},
+        {token.SEMICOLON, <span class="st">&quot;;&quot;</span>},
+        {token.EOF, <span class="st">&quot;&quot;</span>},
+    }
+
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>The <code>input</code> has been extended with a new line that contains a macro literal, making use of the new <code>macro</code> keyword. It could be reduced to just the <code>macro</code> keyword itself, but I like to have context in test inputs. In the <code>tests</code> themselves the only new token is the one with the <code>token.MACRO</code> type.</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./lexer
+--- FAIL: TestNextToken (0.00s)
+  lexer_test.go:149: tests[86] - tokentype wrong. expected=&quot;MACRO&quot;, got=&quot;IDENT&quot;
+FAIL
+FAIL    monkey/lexer    0.007s</code></pre></div>
+<p>The test fails. Perfect! Because now we can insert just one carefully crafted line and make it pass:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// token/token.go</span>
+
+<span class="kw">var</span> keywords = <span class="kw">map</span>[<span class="dt">string</span>]TokenType{
+<span class="co">// [...]</span>
+    <span class="st">&quot;macro&quot;</span>:  MACRO,
+}</code></pre></div>
+<p>Ah, yes, there nothing quite like one-line-fixes.</p>
+<p>That's it for the lexer. The tests pass. It now knows how to handle the <code>macro</code> keyword in Monkey source code. We can move on to the parser.</p>
+<h3 id="parsing-macro-literals">Parsing Macro Literals</h3>
+<p>Now that our lexer knows how to spit out <code>token.MACRO</code> tokens we need to extend our parser so they don't get lost. We need to add support for macro literals.</p>
+<p>The test for that looks really similar to the existing one for function literals:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// parser/parser_test.go</span>
+
+<span class="kw">func</span> TestMacroLiteralParsing(t *testing.T) {
+    input := <span class="st">`macro(x, y) { x + y; }`</span>
+
+    l := lexer.New(input)
+    p := New(l)
+    program := p.ParseProgram()
+    checkParserErrors(t, p)
+
+    <span class="kw">if</span> <span class="bu">len</span>(program.Statements) != <span class="dv">1</span> {
+        t.Fatalf(<span class="st">&quot;program.Body does not contain %d statements. got=%d</span><span class="ch">\n</span><span class="st">&quot;</span>,
+            <span class="dv">1</span>, <span class="bu">len</span>(program.Statements))
+    }
+
+    stmt, ok := program.Statements[<span class="dv">0</span>].(*ast.ExpressionStatement)
+    <span class="kw">if</span> !ok {
+        t.Fatalf(<span class="st">&quot;statement is not ast.ExpressionStatement. got=%T&quot;</span>,
+            program.Statements[<span class="dv">0</span>])
+    }
+
+    macro, ok := stmt.Expression.(*ast.MacroLiteral)
+    <span class="kw">if</span> !ok {
+        t.Fatalf(<span class="st">&quot;stmt.Expression is not ast.MacroLiteral. got=%T&quot;</span>,
+            stmt.Expression)
+    }
+
+    <span class="kw">if</span> <span class="bu">len</span>(macro.Parameters) != <span class="dv">2</span> {
+        t.Fatalf(<span class="st">&quot;macro literal parameters wrong. want 2, got=%d</span><span class="ch">\n</span><span class="st">&quot;</span>,
+            <span class="bu">len</span>(macro.Parameters))
+    }
+
+    testLiteralExpression(t, macro.Parameters[<span class="dv">0</span>], <span class="st">&quot;x&quot;</span>)
+    testLiteralExpression(t, macro.Parameters[<span class="dv">1</span>], <span class="st">&quot;y&quot;</span>)
+
+    <span class="kw">if</span> <span class="bu">len</span>(macro.Body.Statements) != <span class="dv">1</span> {
+        t.Fatalf(<span class="st">&quot;macro.Body.Statements has not 1 statements. got=%d</span><span class="ch">\n</span><span class="st">&quot;</span>,
+            <span class="bu">len</span>(macro.Body.Statements))
+    }
+
+    bodyStmt, ok := macro.Body.Statements[<span class="dv">0</span>].(*ast.ExpressionStatement)
+    <span class="kw">if</span> !ok {
+        t.Fatalf(<span class="st">&quot;macro body stmt is not ast.ExpressionStatement. got=%T&quot;</span>,
+            macro.Body.Statements[<span class="dv">0</span>])
+    }
+
+    testInfixExpression(t, bodyStmt.Expression, <span class="st">&quot;x&quot;</span>, <span class="st">&quot;+&quot;</span>, <span class="st">&quot;y&quot;</span>)
+}</code></pre></div>
+<p>The test doesn't fail, but won't even compile, because the definition of <code>ast.MacroLiteral</code> is missing:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./parser
+# monkey/parser
+parser/parser_test.go:958: undefined: ast.MacroLiteral
+FAIL    monkey/parser [build failed]</code></pre></div>
+<p>That's easily fixed though, since here too we only deviate from the <code>ast.FunctionLiteral</code> in name:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// ast/ast.go</span>
+
+<span class="kw">type</span> MacroLiteral <span class="kw">struct</span> {
+    Token      token.Token <span class="co">// The &#39;macro&#39; token</span>
+    Parameters []*Identifier
+    Body       *BlockStatement
+}
+
+<span class="kw">func</span> (ml *MacroLiteral) expressionNode()      {}
+<span class="kw">func</span> (ml *MacroLiteral) TokenLiteral() <span class="dt">string</span> { <span class="kw">return</span> ml.Token.Literal }
+<span class="kw">func</span> (ml *MacroLiteral) String() <span class="dt">string</span> {
+    <span class="kw">var</span> out bytes.Buffer
+
+    params := []<span class="dt">string</span>{}
+    <span class="kw">for</span> _, p := <span class="kw">range</span> ml.Parameters {
+        params = <span class="bu">append</span>(params, p.String())
+    }
+
+    out.WriteString(ml.TokenLiteral())
+    out.WriteString(<span class="st">&quot;(&quot;</span>)
+    out.WriteString(strings.Join(params, <span class="st">&quot;, &quot;</span>))
+    out.WriteString(<span class="st">&quot;) &quot;</span>)
+    out.WriteString(ml.Body.String())
+
+    <span class="kw">return</span> out.String()
+}</code></pre></div>
+<p>There is absolutely nothing new here besides the name of the type <code>MacroLiteral</code>. Everything else is an exact copy of of <code>ast.FunctionLiteral</code>.</p>
+<p>But it does the trick. The test now properly blows up, because the parser doesn't know how to turn macro literal tokens into an <code>*ast.MacroLiteral</code>:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go">$ <span class="kw">go</span> test ./parser
+--- FAIL: TestMacroLiteralParsing (<span class="dv">0</span>.00s)
+  parser_test.<span class="kw">go</span>:<span class="dv">1124</span>: parser has <span class="dv">6</span> errors
+  parser_test.<span class="kw">go</span>:<span class="dv">1126</span>: parser <span class="dt">error</span>:\
+    <span class="st">&quot;no prefix parse function for MACRO found&quot;</span>
+  parser_test.<span class="kw">go</span>:<span class="dv">1126</span>: parser <span class="dt">error</span>:\
+    <span class="st">&quot;expected next token to be ), got , instead&quot;</span>
+  parser_test.<span class="kw">go</span>:<span class="dv">1126</span>: parser <span class="dt">error</span>:\
+    <span class="st">&quot;no prefix parse function for , found&quot;</span>
+  parser_test.<span class="kw">go</span>:<span class="dv">1126</span>: parser <span class="dt">error</span>:\
+    <span class="st">&quot;no prefix parse function for ) found&quot;</span>
+  parser_test.<span class="kw">go</span>:<span class="dv">1126</span>: parser <span class="dt">error</span>:\
+    <span class="st">&quot;expected next token to be :, got ; instead&quot;</span>
+  parser_test.<span class="kw">go</span>:<span class="dv">1126</span>: parser <span class="dt">error</span>:\
+    <span class="st">&quot;no prefix parse function for } found&quot;</span>
+FAIL
+FAIL    monkey/parser   <span class="dv">0</span>.008s</code></pre></div>
+<p>So far, so good!</p>
+<p>In order to make this test pass, we only have to look at how we parse function literals and adapt it to macro literals.</p>
+<p>Just like the <code>fn</code> keyword, the <code>macro</code> keyword can be found (spoken in the terms of our parser) in a prefix position. That means we have to register a new <code>prefixParseFn</code> for <code>token.MACRO</code> to parse macro literals:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// parser/parser.go</span>
+
+<span class="kw">func</span> New(l *lexer.Lexer) *Parser {
+<span class="co">// [...]</span>
+
+    p.registerPrefix(token.MACRO, p.parseMacroLiteral)
+
+<span class="co">// [...]</span>
+}
+
+<span class="kw">func</span> (p *Parser) parseMacroLiteral() ast.Expression {
+    lit := &amp;ast.MacroLiteral{Token: p.curToken}
+
+    <span class="kw">if</span> !p.expectPeek(token.LPAREN) {
+        <span class="kw">return</span> <span class="ot">nil</span>
+    }
+
+    lit.Parameters = p.parseFunctionParameters()
+
+    <span class="kw">if</span> !p.expectPeek(token.LBRACE) {
+        <span class="kw">return</span> <span class="ot">nil</span>
+    }
+
+    lit.Body = p.parseBlockStatement()
+
+    <span class="kw">return</span> lit
+}</code></pre></div>
+<p>When the parser now encounters a <code>macro</code> keyword it expects to find a pair of <code>()</code> following that, containing the parameters of the macro literal. Here we can just reuse the <code>parseFunctionParameters</code> method, even though they are macro parameters. We can also reuse <code>parseBlockStatement</code> to parse the macro's <code>Body</code>, because it's just that: a block statement, containing zero or more statements.</p>
+<p>Guess what? The tests pass:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./parser
+ok      monkey/parser   0.008s</code></pre></div>
+<p>We can now parse macro literals!</p>
+<h3 id="define-macros">Define Macros</h3>
+<p>Now that the lexer and the parser know how to build <code>ast.MacroLiteral</code>s, we can turn our attention to the problem of finding them in the AST. Remember: the first part of the macro expansion phase is extracting all macro definitions from the AST and saving them. In the second part we evaluate them.</p>
+<p>As always, we start with a test that defines what we want to happen:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/macro_expansion_test.go</span>
+
+<span class="kw">package</span> evaluator
+
+<span class="kw">import</span> (
+    <span class="st">&quot;monkey/ast&quot;</span>
+    <span class="st">&quot;monkey/lexer&quot;</span>
+    <span class="st">&quot;monkey/object&quot;</span>
+    <span class="st">&quot;monkey/parser&quot;</span>
+    <span class="st">&quot;testing&quot;</span>
+)
+
+<span class="kw">func</span> TestDefineMacros(t *testing.T) {
+    input := <span class="st">`</span>
+<span class="st">    let number = 1;</span>
+<span class="st">    let function = fn(x, y) { x + y };</span>
+<span class="st">    let mymacro = macro(x, y) { x + y; };</span>
+<span class="st">    `</span>
+
+    env := object.NewEnvironment()
+    program := testParseProgram(input)
+
+    DefineMacros(program, env)
+
+    <span class="kw">if</span> <span class="bu">len</span>(program.Statements) != <span class="dv">2</span> {
+        t.Fatalf(<span class="st">&quot;Wrong number of statements. got=%d&quot;</span>,
+            <span class="bu">len</span>(program.Statements))
+    }
+
+    _, ok := env.Get(<span class="st">&quot;number&quot;</span>)
+    <span class="kw">if</span> ok {
+        t.Fatalf(<span class="st">&quot;number should not be defined&quot;</span>)
+    }
+    _, ok = env.Get(<span class="st">&quot;function&quot;</span>)
+    <span class="kw">if</span> ok {
+        t.Fatalf(<span class="st">&quot;function should not be defined&quot;</span>)
+    }
+
+    obj, ok := env.Get(<span class="st">&quot;mymacro&quot;</span>)
+    <span class="kw">if</span> !ok {
+        t.Fatalf(<span class="st">&quot;macro not in environment.&quot;</span>)
+    }
+
+    macro, ok := obj.(*object.Macro)
+    <span class="kw">if</span> !ok {
+        t.Fatalf(<span class="st">&quot;object is not Macro. got=%T (%+v)&quot;</span>, obj, obj)
+    }
+
+    <span class="kw">if</span> <span class="bu">len</span>(macro.Parameters) != <span class="dv">2</span> {
+        t.Fatalf(<span class="st">&quot;Wrong number of macro parameters. got=%d&quot;</span>,
+            <span class="bu">len</span>(macro.Parameters))
+    }
+
+    <span class="kw">if</span> macro.Parameters[<span class="dv">0</span>].String() != <span class="st">&quot;x&quot;</span> {
+        t.Fatalf(<span class="st">&quot;parameter is not &#39;x&#39;. got=%q&quot;</span>, macro.Parameters[<span class="dv">0</span>])
+    }
+    <span class="kw">if</span> macro.Parameters[<span class="dv">1</span>].String() != <span class="st">&quot;y&quot;</span> {
+        t.Fatalf(<span class="st">&quot;parameter is not &#39;y&#39;. got=%q&quot;</span>, macro.Parameters[<span class="dv">1</span>])
+    }
+
+    expectedBody := <span class="st">&quot;(x + y)&quot;</span>
+
+    <span class="kw">if</span> macro.Body.String() != expectedBody {
+        t.Fatalf(<span class="st">&quot;body is not %q. got=%q&quot;</span>, expectedBody, macro.Body.String())
+    }
+}
+
+<span class="kw">func</span> testParseProgram(input <span class="dt">string</span>) *ast.Program {
+    l := lexer.New(input)
+    p := parser.New(l)
+    <span class="kw">return</span> p.ParseProgram()
+}</code></pre></div>
+<p>With over 50 lines <code>TestDefineMacros</code> is quite a mouthful. Thankfully a lot of it is just boilerplate and sanity checks. What it boils down to is making sure that the to-be-written function <code>DefineMacros</code> takes a parsed program and an <code>*object.Environment</code> as arguments and adds macro definitions from one to the other. It also expects that other let statements are ignored, so they can later be evaluated.</p>
+<p>The attentive reader may have anticipated what happens when we try to run this test. Yes, it not only fails, but doesn't even compile. Besides the aforementioned <code>DefineMacros</code> function a certain <code>*object.Macro</code> is also undefined. Let's fix that first, so we can get closer to a failing test.</p>
+<p>Similar to <code>ast.MacroLiteral</code> and <code>ast.FunctionLiteral</code> the new <code>object.Macro</code> is a near exact copy of <code>object.Function</code>, except that it has a different name. That makes life easier for us but this next addition not too exciting:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// object/object.go</span>
+
+<span class="kw">const</span> (
+<span class="co">// [...]</span>
+    MACRO_OBJ = <span class="st">&quot;MACRO&quot;</span>
+)
+
+<span class="kw">type</span> Macro <span class="kw">struct</span> {
+    Parameters []*ast.Identifier
+    Body       *ast.BlockStatement
+    Env        *Environment
+}
+
+<span class="kw">func</span> (m *Macro) Type() ObjectType { <span class="kw">return</span> MACRO_OBJ }
+<span class="kw">func</span> (m *Macro) Inspect() <span class="dt">string</span> {
+    <span class="kw">var</span> out bytes.Buffer
+
+    params := []<span class="dt">string</span>{}
+    <span class="kw">for</span> _, p := <span class="kw">range</span> m.Parameters {
+        params = <span class="bu">append</span>(params, p.String())
+    }
+
+    out.WriteString(<span class="st">&quot;macro&quot;</span>)
+    out.WriteString(<span class="st">&quot;(&quot;</span>)
+    out.WriteString(strings.Join(params, <span class="st">&quot;, &quot;</span>))
+    out.WriteString(<span class="st">&quot;) {</span><span class="ch">\n</span><span class="st">&quot;</span>)
+    out.WriteString(m.Body.String())
+    out.WriteString(<span class="st">&quot;</span><span class="ch">\n</span><span class="st">}&quot;</span>)
+
+    <span class="kw">return</span> out.String()
+}</code></pre></div>
+<p>All the fields and methods are exactly like their counterparts in <code>object.Function</code>, only the name of the type itself and the <code>ObjectType</code> are different.</p>
+<p>And with that the test is finally... Well, it's not passing, or even failing yet, but it now points us in the right direction, I'd say:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+# monkey/evaluator
+evaluator/macro_expansion_test.go:21: undefined: DefineMacros
+FAIL    monkey/evaluator [build failed]</code></pre></div>
+<p>That's a good thing. Because now we can make it compile and <em>pass</em> in one swoop by defining <code>DefineMacro</code>:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/macro_expansion.go</span>
+
+<span class="kw">package</span> evaluator
+
+<span class="kw">import</span> (
+    <span class="st">&quot;monkey/ast&quot;</span>
+    <span class="st">&quot;monkey/object&quot;</span>
+)
+
+<span class="kw">func</span> DefineMacros(program *ast.Program, env *object.Environment) {
+    definitions := []<span class="dt">int</span>{}
+
+    <span class="kw">for</span> i, statement := <span class="kw">range</span> program.Statements {
+        <span class="kw">if</span> isMacroDefinition(statement) {
+            addMacro(statement, env)
+            definitions = <span class="bu">append</span>(definitions, i)
+        }
+    }
+
+    <span class="kw">for</span> _, i := <span class="kw">range</span> definitions {
+        program.Statements = <span class="bu">append</span>(
+            program.Statements[:i],
+            program.Statements[i+<span class="dv">1</span>:]...,
+        )
+    }
+}</code></pre></div>
+<p>This function does two things: finding macro definitions in and removing them from the AST. It finds them by going through all the <code>program</code>'s <code>Statements</code> and checking each whether it's such a definition with the help of <code>isMacroDefinition</code>. If it is, it keeps track of the definition's position in the <code>Statements</code> slice so it can remove it at the end.</p>
+<p>Of note is that we only allow top-level macro definitions. We don't walk down the <code>Statements</code> and check the child nodes for more. The reason for that is the scope of this text. It's not a limitation inherent to the way macros work in Monkey. In fact, the opposite is the case: allowing nested macro definitions might make a fantastic reader exercise, don't you think?</p>
+<p>The two helper functions used here, <code>isMacroDefinition</code> and <code>addMacro</code>, do what their names promise. Here is <code>isMacroDefinition</code>:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/macro_expansion.go</span>
+
+<span class="kw">func</span> isMacroDefinition(node ast.Statement) <span class="dt">bool</span> {
+    letStatement, ok := node.(*ast.LetStatement)
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> <span class="ot">false</span>
+    }
+
+    _, ok = letStatement.Value.(*ast.MacroLiteral)
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> <span class="ot">false</span>
+    }
+
+    <span class="kw">return</span> <span class="ot">true</span>
+}</code></pre></div>
+<p>Yep, a simple check to make sure that we do have a <code>*ast.LetStatement</code> at hand that binds a <code>MacroLiteral</code> to a name. There is not a lot going on, but this function has a lot of power. It defines what a valid macro definition is and isn't. Consider this:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="kw">let</span> myMacro <span class="op">=</span> <span class="at">macro</span>(x) <span class="op">{</span> x <span class="op">};</span>
+<span class="kw">let</span> anotherNameForMyMacro <span class="op">=</span> myMacro<span class="op">;</span></code></pre></div>
+<p><code>isMacroDefinition</code> wouldn't recognize the second let statement as a valid macro definition. That's certainly something to keep in mind.</p>
+<p>But if <code>isMacroDefinition</code> returns true, we can pass the let statement to <code>addMacro</code>, which adds the macro definition to the environment:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/macro_expansion.go</span>
+
+<span class="kw">func</span> addMacro(stmt ast.Statement, env *object.Environment) {
+    letStatement, _ := stmt.(*ast.LetStatement)
+    macroLiteral, _ := letStatement.Value.(*ast.MacroLiteral)
+
+    macro := &amp;object.Macro{
+        Parameters: macroLiteral.Parameters,
+        Env:        env,
+        Body:       macroLiteral.Body,
+    }
+
+    env.Set(letStatement.Name.Value, macro)
+}</code></pre></div>
+<p>Combined with <code>isMacroDefinition</code> the type assertions in the first two lines are redundant, which is why we ignore possible errors. That's not beautiful, but still the simplest way (for now) to organize both functions. Ignoring that prelude, what <code>addMacro</code> does is adding a newly constructed <code>*object.Macro</code> to the passed in <code>*object.Environment</code>, binding it to the name given in the <code>*ast.LetStatement</code>.</p>
+<p>With these three functions defined our test is passing:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+ok      monkey/evaluator        0.009s</code></pre></div>
+<p>That means, we are now able to bind macro literals to names in Monkey source code, find them in the AST and save them. Yes, that's pretty neat!</p>
+<p>In order to complete the macro expansion phase all that's left for us to do now is to actually expand the macros.</p>
+<h3 id="expand-macros">Expand Macros</h3>
+<p>Before we get started with a test, let's refresh our short term memory: expanding macros means evaluating calls to macros and reinserting the result of the evaluation into the AST, replacing the original call expression.</p>
+<p>Does that remind you of something? I thought so. Yes, this is pretty close to how <code>unquote</code> works and you'll see that the implementations are pretty similar. But where an <code>unquote</code> call only causes its single argument to be evaluated, macro calls result in the body of the macro being evaluated, with the arguments made available in the environment.</p>
+<p>That being said, here is a test that demonstrates what we want to happen in the macro expansion phase:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/macro_expansion.go</span>
+
+<span class="kw">func</span> TestExpandMacros(t *testing.T) {
+    tests := []<span class="kw">struct</span> {
+        input    <span class="dt">string</span>
+        expected <span class="dt">string</span>
+    }{
+        {
+            <span class="st">`</span>
+<span class="st">            let infixExpression = macro() { quote(1 + 2); };</span>
+
+<span class="st">            infixExpression();</span>
+<span class="st">            `</span>,
+            <span class="st">`(1 + 2)`</span>,
+        },
+        {
+            <span class="st">`</span>
+<span class="st">            let reverse = macro(a, b) { quote(unquote(b) - unquote(a)); };</span>
+
+<span class="st">            reverse(2 + 2, 10 - 5);</span>
+<span class="st">            `</span>,
+            <span class="st">`(10 - 5) - (2 + 2)`</span>,
+        },
+    }
+
+    <span class="kw">for</span> _, tt := <span class="kw">range</span> tests {
+        expected := testParseProgram(tt.expected)
+        program := testParseProgram(tt.input)
+
+        env := object.NewEnvironment()
+        DefineMacros(program, env)
+        expanded := ExpandMacros(program, env)
+
+        <span class="kw">if</span> expanded.String() != expected.String() {
+            t.Errorf(<span class="st">&quot;not equal. want=%q, got=%q&quot;</span>,
+                expected.String(), expanded.String())
+        }
+    }
+}</code></pre></div>
+<p>The basic idea behind these test cases is this: we expand the macro calls in the <code>input</code> and compare the result of that expansion against the AST we get from parsing the <code>expected</code> source code. In order to do that, we construct a fresh environment, <code>env</code>, and use <code>DefineMacros</code> to save the macro definitions in the <code>input</code> to <code>env</code>. Then we use the function we're going to write next, <code>ExpandMacros</code>, to expand the macro calls.</p>
+<p>It's worth pointing out that the macros in both test cases use <code>quote</code> to return a quoted AST node. That's not a random choice, no, that's a rule we now define for our macro system: you <em>must</em> return an <code>*object.Quote</code> from a macro. If a macro didn't return a quoted AST node, we'd have to convert its return value into one, just like we did when evaluating <code>unquote</code> calls with <code>convertObjectToASTNode</code>. And that's cumbersome. So instead we just make the usage of <code>quote</code> a requirement. Ultimately that makes the macros more powerful, since they're not constrained by what <code>convertObjectToASTNode</code> can and can't do.</p>
+<p>The first test case, the one defining the <code>infixExpression</code> macro, makes sure that macros really return unevaluated source code. The result of a call to <code>infixExpression</code> should be the infix expression <code>1 + 2</code> and <em>not</em> <code>3</code>.</p>
+<p>The <code>reverse</code> macro in the second test case uses more features of the macro system. It has two parameters, <code>a</code> and <code>b</code>, and returns an infix expression in which the order of the parameters is reversed. The remarkable thing here is, of course, that the parameters won't be evaluated. <code>2 + 2</code> doesn't turn into <code>4</code> and <code>10 - 5</code> doesn't turn into <code>5</code>. Instead, <code>reverse</code> builds up a new AST node with <code>quote</code> and uses <code>unquote</code> to access its parameters so it can place them, unevaluated, into a new infix expression. If you're scratching your head about why the calls to <code>unquote</code> are necessary: without them the <code>reverse</code> macro would simply return <code>b - a</code>.</p>
+<p>Alright, now that we know how the tests work and what they are supposed to do, how to they fare when passed to <code>go test</code>?</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go">$ <span class="kw">go</span> test ./evaluator
+# monkey/evaluator
+evaluator/macro_expansion_test.<span class="kw">go</span>:<span class="dv">95</span>: undefined: ExpandMacros
+FAIL    monkey/evaluator [build failed]</code></pre></div>
+<p>Not so good, which is good, because now we'll make them pass by defining <code>ExpandMacros</code>:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/macro_expansion.go</span>
+
+<span class="kw">func</span> ExpandMacros(program ast.Node, env *object.Environment) ast.Node {
+    <span class="kw">return</span> ast.Modify(program, <span class="kw">func</span>(node ast.Node) ast.Node {
+        callExpression, ok := node.(*ast.CallExpression)
+        <span class="kw">if</span> !ok {
+            <span class="kw">return</span> node
+        }
+
+        macro, ok := isMacroCall(callExpression, env)
+        <span class="kw">if</span> !ok {
+            <span class="kw">return</span> node
+        }
+
+        args := quoteArgs(callExpression)
+        evalEnv := extendMacroEnv(macro, args)
+
+        evaluated := Eval(macro.Body, evalEnv)
+
+        quote, ok := evaluated.(*object.Quote)
+        <span class="kw">if</span> !ok {
+            <span class="bu">panic</span>(<span class="st">&quot;we only support returning AST-nodes from macros&quot;</span>)
+        }
+
+        <span class="kw">return</span> quote.Node
+    })
+}
+
+<span class="kw">func</span> isMacroCall(
+    exp *ast.CallExpression,
+    env *object.Environment,
+) (*object.Macro, <span class="dt">bool</span>) {
+    identifier, ok := exp.Function.(*ast.Identifier)
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> <span class="ot">nil</span>, <span class="ot">false</span>
+    }
+
+    obj, ok := env.Get(identifier.Value)
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> <span class="ot">nil</span>, <span class="ot">false</span>
+    }
+
+    macro, ok := obj.(*object.Macro)
+    <span class="kw">if</span> !ok {
+        <span class="kw">return</span> <span class="ot">nil</span>, <span class="ot">false</span>
+    }
+
+    <span class="kw">return</span> macro, <span class="ot">true</span>
+}
+
+<span class="kw">func</span> quoteArgs(exp *ast.CallExpression) []*object.Quote {
+    args := []*object.Quote{}
+
+    <span class="kw">for</span> _, a := <span class="kw">range</span> exp.Arguments {
+        args = <span class="bu">append</span>(args, &amp;object.Quote{Node: a})
+    }
+
+    <span class="kw">return</span> args
+}
+
+<span class="kw">func</span> extendMacroEnv(
+    macro *object.Macro,
+    args []*object.Quote,
+) *object.Environment {
+    extended := object.NewEnclosedEnvironment(macro.Env)
+
+    <span class="kw">for</span> paramIdx, param := <span class="kw">range</span> macro.Parameters {
+        extended.Set(param.Value, args[paramIdx])
+    }
+
+    <span class="kw">return</span> extended
+}</code></pre></div>
+<p><em>This is it</em>. That's how we expand macros. That's the complete macro expansion phase in four functions. Let's take a closer look.</p>
+<p><code>ExpandMacros</code> uses our trusty helper <code>ast.Modify</code> to recursively walk down the <code>program</code> AST and find calls to macros. If the <code>node</code> at hand is a call expression involving a macro its next step is to evaluate the call.</p>
+<p>For that, it takes the arguments and turns them into <code>*object.Quote</code>s with the help of <code>quoteArgs</code>. Then it uses <code>extendMacroEnv</code> to extend the macro's environment with the arguments of the call bound to the parameter names of the macro literal. That's the same preparation that happens when we call a function in <code>Eval</code>.</p>
+<p>With the arguments quoted and the environment extended, it's time to evaluate the macro. For that <code>ExpandMacros</code> uses <code>Eval</code> to evaluate the macro's body with the newly extended environment passed in. Finally, and this is important, it returns the quoted AST node, the result of the evaluation. By doing that, instead of modifying a node, it replaces the macro call with the result of the evaluation. It <em>expands</em> the macro.</p>
+<p>The tests pass:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+ok      monkey/evaluator        0.010s</code></pre></div>
+<p>Yes, our macro expansion phase is complete! We have now officially implemented a working macro system for the Monkey programming language! It's time to celebrate and put &quot;meta programmer&quot; on our CVs.</p>
+<p>While we may sip champagne now, tradition tells us that must also write a macro called <code>unless</code>.</p>
+<h3 id="the-mighty-unless-macro">The Mighty Unless Macro</h3>
+<p>An <code>unless</code> macro is usually the first macro shown in any introduction to macros. It's perfect for that: it's easy to understand and to implement and it also demonstrates what a macro system can do and how it does what it does. All the while, it also shows the limitations of normal functions and how macros transcend them, allowing the user to extend a programming language with constructs that look like they're built-in but are &quot;just&quot; macros.</p>
+<p>Before we implement it, though, let's see what <code>unless</code> is exactly and what it's supposed to do. Consider this piece of Monkey code:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="cf">if</span> (<span class="dv">10</span> <span class="op">&gt;</span> <span class="dv">5</span>) <span class="op">{</span>
+  <span class="at">puts</span>(<span class="st">&quot;yes, 10 is greater than 5&quot;</span>)
+<span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+  <span class="at">puts</span>(<span class="st">&quot;holy monkey, 10 is not greater than 5?!&quot;</span>)
+<span class="op">}</span></code></pre></div>
+<p>This should - one hopes - print <code>&quot;yes, 10 is greater than 5&quot;</code>.</p>
+<p>Now, if Monkey had <code>unless</code> built-in, we could write the above code as follows:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="at">unless</span> (<span class="dv">10</span> <span class="op">&gt;</span> <span class="dv">5</span>) <span class="op">{</span>
+  <span class="at">puts</span>(<span class="st">&quot;holy monkey, 10 is not greater than 5?!&quot;</span>)
+<span class="op">}</span> <span class="cf">else</span> <span class="op">{</span>
+  <span class="at">puts</span>(<span class="st">&quot;yes, 10 is greater than 5&quot;</span>)
+<span class="op">}</span></code></pre></div>
+<p>This sometimes makes the code more intention revealing and thus easier to understand. <code>unless</code> is a good thing to have.</p>
+<p>But we know what adding <code>unless</code> to Monkey itself would mean for us: adding a new token type, modifying the lexer, extending the parser with new parsing functions so it can build a new <code>UnlessExpression</code> AST node and then adding a new <code>case</code> branch to our <code>Eval</code> function so it can handle this new node. That's a lot of work.</p>
+<p>Here's the great news: now that we have macros in Monkey we don't have to extend Monkey itself; we don't have to change our tokens, lexer, AST, parser or <code>Eval</code>; we can implement <code>unless</code> as a macro!</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="at">unless</span>(<span class="dv">10</span> <span class="op">&gt;</span> <span class="dv">5</span><span class="op">,</span> <span class="at">puts</span>(<span class="st">&quot;nope, not greater&quot;</span>)<span class="op">,</span> <span class="at">puts</span>(<span class="st">&quot;yep, greater&quot;</span>))<span class="op">;</span>
+<span class="co">// outputs: &quot;yep, greater&quot;</span></code></pre></div>
+<p>This will only print <code>&quot;yep, greater&quot;</code>.</p>
+<p>Yes, it looks just like a normal function call. The magic lies in how it works. Or: that it works at all. Because if <code>unless</code> in the code above were a normal function, the code wouldn't work as expected. Both calls to <code>puts</code> would be evaluated before the body of <code>unless</code> itself, resulting in both <code>&quot;nope, not greater&quot;</code> and <code>&quot;yep, greater&quot;</code> being printed. That's not what we want.</p>
+<p>As a macro though, <code>unless</code> would work exactly like we would expect it to! Let's add it as a test case to our existing <code>ExpandMacros</code> function to make sure of it:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// evaluator/macro_expansion_test.go</span>
+
+<span class="kw">func</span> TestExpandMacros(t *testing.T) {
+    tests := []<span class="kw">struct</span> {
+        input    <span class="dt">string</span>
+        expected <span class="dt">string</span>
+    }{
+        <span class="co">// [...]</span>
+        {
+            <span class="st">`</span>
+<span class="st">            let unless = macro(condition, consequence, alternative) {</span>
+<span class="st">                quote(if (!(unquote(condition))) {</span>
+<span class="st">                    unquote(consequence);</span>
+<span class="st">                } else {</span>
+<span class="st">                    unquote(alternative);</span>
+<span class="st">                });</span>
+<span class="st">            };</span>
+
+<span class="st">            unless(10 &gt; 5, puts(&quot;not greater&quot;), puts(&quot;greater&quot;));</span>
+<span class="st">            `</span>,
+            <span class="st">`if (!(10 &gt; 5)) { puts(&quot;not greater&quot;) } else { puts(&quot;greater&quot;) }`</span>,
+        },
+    }
+
+    <span class="co">// [...]</span>
+}</code></pre></div>
+<p>The <code>unless</code> macro we define in the test case uses <code>quote</code> to construct the AST of an if-conditional, but adds the negating <code>!</code> prefix operator and uses <code>unquote</code> to insert the three arguments into the AST: <code>condition</code>, <code>consequence</code> and <code>alternative</code>. At the end of the test case we call the newly defined macro to make sure that the AST it produces matches the one we expect.</p>
+<p>Now the question is: does the test pass? Does this work? Did we really enhance Monkey in such a way that it allows us to write code that writes code? Using <code>macro</code>, <code>quote</code> and <code>unquote</code>? Yes, we did!</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go test ./evaluator
+ok      monkey/evaluator        0.009s</code></pre></div>
+<p>It's time we take this on the road.</p>
+<h2 id="extending-the-repl">5.6 - Extending the REPL</h2>
+<p>The fact that we're able to use macros in test cases is cool. Some would even say, it's amazingly cool. But still... It doesn't feel real until you can use them in the REPL. Thankfully, there is only a tiny number of lines of code stopping us doing amazing macro magic in our Monkey REPL.</p>
+<p>Let's add those, shall we?</p>
+<p>The first thing we need to add to our REPL is a new, separate environment just for macros:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// repl/repl.go</span>
+
+<span class="kw">func</span> Start(in io.Reader, out io.Writer) {
+<span class="co">// [...]</span>
+  env := object.NewEnvironment()
+  macroEnv := object.NewEnvironment()
+<span class="co">// [...]</span>
+}</code></pre></div>
+<p>The existing <code>env</code> will be used, just as it was before, by <code>Eval</code>. But the new <code>macroEnv</code> we will pass to <code>DefineMacros</code> and <code>ExpandMacros</code>.</p>
+<p>Now, since the REPL works on a line-by-line basis, each line is a new <code>ast.Program</code>, which we now need to put through the macro expansion phase. So in the main loop of the REPL, just after we parsed a new line and before we pass the <code>ast.Program</code> to <code>Eval</code>, we can insert our macro expansion phase:</p>
+<div class="sourceCode"><pre class="sourceCode go"><code class="sourceCode go"><span class="co">// repl/repl.go</span>
+
+<span class="kw">func</span> Start(in io.Reader, out io.Writer) {
+    <span class="co">// [...]</span>
+
+    <span class="kw">for</span> {
+        <span class="co">// [...]</span>
+        program := p.ParseProgram()
+        <span class="co">// [...]</span>
+
+        evaluator.DefineMacros(program, macroEnv)
+        expanded := evaluator.ExpandMacros(program, macroEnv)
+
+        evaluated := evaluator.Eval(expanded, env)
+
+        <span class="co">// [...]</span>
+    }
+}</code></pre></div>
+<p>Perfect! That's all it took! We're out of the lab and can hit the road, because we are now able to do macro magic in the REPL!</p>
+<p>Due to the way our REPL works, we need to enter the definition of <code>unless</code> on one line. But due to the way text works, the line is too long to show here, so I inserted newline breaks, signified by the <code>\</code> in it. You can remove those and enter the definition as one line:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">$ go run main.go
+Hello mrnugget! This is the Monkey programming language!
+Feel free to type in commands
+&gt;&gt; let unless = macro(condition, consequence, alternative)\
+ { quote(if (!(unquote(condition))) { unquote(consequence); }\
+ else { unquote(alternative); }); };</code></pre></div>
+<p>And with that definition entered, we can start to play a drum roll sound in the background and type in - perfectly timed, of course - the following line:</p>
+<div class="sourceCode"><pre class="sourceCode changelog"><code class="sourceCode changelog">&gt;&gt; unless(10 &gt; 5, puts(&quot;not greater&quot;), puts(&quot;greater&quot;));
+greater</code></pre></div>
+<h2 id="dream-on...-in-macros">5.7 - Dream On... In Macros</h2>
+<p>Our macro system works well and enables us to do some really mind-blowing things. It allows us to write code that writes code. Let's repeat that: it allows us to write code that writes code! That's amazing! We can be proud of ourselves. And the best part? It hasn't even reached its maximum potential. It can be even more powerful, beautiful, elegant and user-friendly. There's still room for improvement.</p>
+<p>First on the list of possible improvements is what I like to call the &quot;nasty stuff&quot;. Things that are hard to do right but are essential for a production ready system. I know that I mentioned this before, but it bears repeating. I'd also get into trouble if I didn't hit you over the head again with the old &quot;handle yer errors&quot; stick. But the error handling and debugging support in our macro system is severely lacking.</p>
+<p>To be precise, we don't have any. Us Monkey programmers, we don't mind living in the fast lane, I know, but sooner or later, when we write some <em>serious</em> macros, we'd tear our hair out, because we can't get reliable debugging information about the macro expansion phase. We're also pretty careless about which tokens our modified AST nodes carry around and we didn't even touch the topic of &quot;macro hygiene&quot;. I urge you to explore and research these topics.</p>
+<p>So there's that. One area where our macro system can be improved; error handling and debugging support. Exhausting to build but essential once we want to get serious about this.</p>
+<p>Alright, now that we've talked about the harsh realities of producing a robust and debuggable macro system, let's turn our backs to that and dream for a bit, thinking in terms of &quot;what if...?&quot;</p>
+<p>Currently, we only allow passing expressions to <code>quote</code> and <code>unquote</code>. One consequence of that is that we can't use a return statement or a let statement as an argument in a <code>quote()</code> call, for example. The parser won't let us, simply because arguments in call expression can only be of type <code>ast.Expression</code>.</p>
+<p>But what if we would make <code>quote</code> and <code>unquote</code> separate keywords and gave them their own AST nodes? That would allows us to extend the parser in such a way that it allows any AST node as arguments to the calls. We could pass in expressions <em>and</em> statements! And if we had separate AST nodes, could we extend the allowed syntax even more?</p>
+<p>What if we could pass block statements to <code>quote</code>/<code>unquote</code> calls? That would allow to do something like this:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="at">quote</span>() <span class="op">{</span>
+  <span class="kw">let</span> one <span class="op">=</span> <span class="dv">1</span><span class="op">;</span>
+  <span class="kw">let</span> two <span class="op">=</span> <span class="dv">2</span><span class="op">;</span>
+  one <span class="op">+</span> two<span class="op">;</span>
+<span class="op">}</span></code></pre></div>
+<p>Wouldn't that be neat?</p>
+<p>Now, what if function calls didn't require parentheses around their arguments? What if identifiers could contain special characters? What if we had something like identifiers that resolve to themselves? Like atoms or symbols in other languages. What if every function could take an additional <code>*ast.BlockStatement</code> as an argument? What if ...?</p>
+<p>The point is this: the rules given by the parser determine what constitutes valid Monkey syntax and play a huge part in how expressive and powerful macros can be. When we change these rules, we simultaneously change what macros can and can't do. And there sure are a lot of possible changes to make. Take a look at Elixir or any Lisp, for inspiration, to see how the syntax gives power to the macro systems and how that in turn makes the language itself more powerful and expressive.</p>
+<p>The other big influence on the power of our macro system is its ability to access, modify and construct AST nodes. Here's an example. Let's say we have two built-in functions, called <code>left</code> and <code>right</code>, that respectively return the left and right child nodes of an AST node. That would allow us to do something like this:</p>
+<div class="sourceCode"><pre class="sourceCode javascript"><code class="sourceCode javascript"><span class="kw">let</span> plusToMinus <span class="op">=</span> <span class="at">macro</span>(infixExpression) <span class="op">{</span>
+  <span class="at">quote</span>(<span class="at">unquote</span>(<span class="at">left</span>(infixExpression)) <span class="op">-</span> <span class="at">unquote</span>(<span class="at">right</span>(infixExpression)))
+<span class="op">}</span></code></pre></div>
+<p>Now <em>that</em> would enable us to write some really, really interesting macros!</p>
+<p>What if we had more of these functions? Something like an <code>operator</code> function, that returns the operator of an infix expression? Or an <code>arguments</code> function that returns an array of the argument nodes in a call expression? Or a generic <code>children</code> function? What if our built-in functions <code>len</code>, <code>first</code> and <code>last</code> would work with AST nodes?</p>
+<p>Now, here is the ultimate &quot;what if&quot; of them all: what if the AST was built with the same data structures that the rest of the language uses? Imagine for a second that the Monkey AST was built purely out of <code>object.Array</code>, <code>object.Hash</code>, <code>object.String</code>, <code>object.Integer</code>, and others. Just imagine what that would enable us to do and seamless the whole experience would be. Inspiring, right? If you want to get a taste of that, take a look at a Lisp like Clojure, Racket or Guile, or non-Lisp languages with great macro systems like Elixir and Julia.</p>
+<p>So, you see, there's a lot of room for dreams when writing code that writes code.</p>
+
+      </body>
+</html>
